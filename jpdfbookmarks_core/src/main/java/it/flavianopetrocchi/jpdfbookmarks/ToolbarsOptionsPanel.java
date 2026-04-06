@@ -22,6 +22,7 @@
 package it.flavianopetrocchi.jpdfbookmarks;
 
 import it.flavianopetrocchi.utilities.Ut;
+import java.awt.FlowLayout;
 
 /**
  * The toolbar options panel of the options dialog.
@@ -49,6 +50,7 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
         checkOtherActions.setSelected(userPrefs.getShowToolbar(Prefs.SHOW_OTHERS_TB));
         checkUndoRedo.setSelected(userPrefs.getShowToolbar(Prefs.SHOW_UNDO_TB));
         checkWebOperations.setSelected(userPrefs.getShowToolbar(Prefs.SHOW_WEB_TB));
+        checkAiToolbar.setSelected(userPrefs.getShowToolbar(Prefs.SHOW_AI_TB));
         checkZoom.setSelected(userPrefs.getShowToolbar(Prefs.SHOW_ZOOM_TB));
     }
 
@@ -63,6 +65,7 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
         userPrefs.setShowToolbar(Prefs.SHOW_OTHERS_TB, checkOtherActions.isSelected());
         userPrefs.setShowToolbar(Prefs.SHOW_UNDO_TB, checkUndoRedo.isSelected());
         userPrefs.setShowToolbar(Prefs.SHOW_WEB_TB, checkWebOperations.isSelected());
+        userPrefs.setShowToolbar(Prefs.SHOW_AI_TB, checkAiToolbar.isSelected());
         userPrefs.setShowToolbar(Prefs.SHOW_ZOOM_TB, checkZoom.isSelected());
     }
 
@@ -82,6 +85,8 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
         checkFitType = new javax.swing.JCheckBox();
         checkNavigation = new javax.swing.JCheckBox();
         checkWebOperations = new javax.swing.JCheckBox();
+        checkAiToolbar = new javax.swing.JCheckBox();
+        panelWebAndAiToolbars = new javax.swing.JPanel();
         btnShowAllMain = new javax.swing.JButton();
         btnHideAllMain = new javax.swing.JButton();
         panelBookmarksToolbars = new javax.swing.JPanel();
@@ -107,6 +112,12 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
         checkNavigation.setText(bundle.getString("TOOLBAR_NAV")); // NOI18N
 
         checkWebOperations.setText(bundle.getString("TOOLBAR_WEB")); // NOI18N
+
+        checkAiToolbar.setText(bundle.getString("TOOLBAR_AI")); // NOI18N
+
+        panelWebAndAiToolbars.setLayout(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        panelWebAndAiToolbars.add(checkWebOperations);
+        panelWebAndAiToolbars.add(checkAiToolbar);
 
         btnShowAllMain.setText(bundle.getString("TOOLBAR_SHOW_ALL")); // NOI18N
         btnShowAllMain.addActionListener(new java.awt.event.ActionListener() {
@@ -140,7 +151,7 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(panelMainToolbarsLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(checkZoom)
-                    .addComponent(checkWebOperations))
+                    .addComponent(panelWebAndAiToolbars))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(panelMainToolbarsLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addComponent(btnHideAllMain, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -159,7 +170,7 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
                 .addGroup(panelMainToolbarsLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkNavigation)
                     .addComponent(checkOtherActions)
-                    .addComponent(checkWebOperations)
+                    .addComponent(panelWebAndAiToolbars)
                     .addComponent(btnHideAllMain, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -254,12 +265,12 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
 
     private void btnShowAllMainActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnShowAllMainActionPerformed
         Ut.setSelectedButtons(true, checkFileActions, checkFitType, checkZoom,
-                checkNavigation, checkOtherActions, checkWebOperations);
+                checkNavigation, checkOtherActions, checkWebOperations, checkAiToolbar);
     }//GEN-LAST:event_btnShowAllMainActionPerformed
 
     private void btnHideAllMainActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnHideAllMainActionPerformed
         Ut.setSelectedButtons(false, checkFileActions, checkFitType, checkZoom,
-                checkNavigation, checkOtherActions, checkWebOperations);
+                checkNavigation, checkOtherActions, checkWebOperations, checkAiToolbar);
     }//GEN-LAST:event_btnHideAllMainActionPerformed
 
     private void btnShowAllBookmarksActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnShowAllBookmarksActionPerformed
@@ -287,8 +298,10 @@ public class ToolbarsOptionsPanel extends javax.swing.JPanel {
     private javax.swing.JCheckBox checkOtherActions;
     private javax.swing.JCheckBox checkUndoRedo;
     private javax.swing.JCheckBox checkWebOperations;
+    private javax.swing.JCheckBox checkAiToolbar;
     private javax.swing.JCheckBox checkZoom;
     private javax.swing.JPanel panelBookmarksToolbars;
     private javax.swing.JPanel panelMainToolbars;
+    private javax.swing.JPanel panelWebAndAiToolbars;
     // End of variables declaration//GEN-END:variables
 }

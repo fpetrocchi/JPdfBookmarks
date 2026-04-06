@@ -38,6 +38,7 @@ public class OptionsDlg extends javax.swing.JDialog {
     private ConnectionOptionsPanel connectionOptions = new ConnectionOptionsPanel(userPrefs);
     private ToolbarsOptionsPanel toolbarsOptions = new ToolbarsOptionsPanel(userPrefs);
     private GeneralOptionsPanel generalOptions = new GeneralOptionsPanel(userPrefs);
+    private AiOptionsPanel aiOptions = new AiOptionsPanel();
 //    private EncodingOptionsPanel encodingOptions = new EncodingOptionsPanel(userPrefs);
     private JPdfBookmarksGui gui;
 
@@ -57,7 +58,10 @@ public class OptionsDlg extends javax.swing.JDialog {
         mainTabPane.setMnemonicAt(0, Res.mnemonicFromRes("TAB_SEPARATOR_OPTIONS_MNEMONIC"));
         mainTabPane.addTab(Res.getString("TAB_CONNECTION_OPTIONS"), connectionOptions);
         mainTabPane.setMnemonicAt(0, Res.mnemonicFromRes("TAB_CONNECTION_OPTIONS_MNEMONIC"));
-        mainTabPane.add(Res.getString("TAB_TOOLBARS_MANAGER"), toolbarsOptions);
+        mainTabPane.addTab(Res.getString("TAB_TOOLBARS_MANAGER"), toolbarsOptions);
+        aiOptions.loadSettings(userPrefs);
+        mainTabPane.addTab(Res.getString("TAB_AI_OPTIONS"), aiOptions);
+        mainTabPane.setMnemonicAt(4, Res.mnemonicFromRes("TAB_AI_OPTIONS_MNEMONIC"));
 //        mainTabPane.setMnemonicAt(0, Res.mnemonicFromRes("TAB_ENCODING_OPTIONS_MNEMONIC"));
 //        mainTabPane.add(Res.getString("TAB_ENCODING_OPTIONS"), encodingOptions);
 
@@ -193,6 +197,8 @@ public class OptionsDlg extends javax.swing.JDialog {
             userPrefs.setCheckUpdatesOnStart(connectionOptions.checkUpdatesOnStart());
 
             userPrefs.setNeverAskWebAccess(connectionOptions.neverAskWebAccess());
+
+            aiOptions.saveSettings(userPrefs);
 
             toolbarsOptions.saveToolbarPreferences();
             // if called from menubar of JPdfBookmarksGui (not on macOS!)

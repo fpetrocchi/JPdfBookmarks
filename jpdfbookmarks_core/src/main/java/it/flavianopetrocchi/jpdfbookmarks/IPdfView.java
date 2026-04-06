@@ -27,6 +27,7 @@ import it.flavianopetrocchi.jpdfbookmarks.bookmark.Bookmark;
 import java.awt.Rectangle;
 import java.io.File;
 import javax.swing.JScrollPane;
+import org.apache.pdfbox.pdmodel.PDDocument;
 
 /**
  * An interface to a PDF viewer.
@@ -41,6 +42,14 @@ public interface IPdfView {
         public void open(File file, String password) throws Exception;
         public void reopen(File file) throws Exception;
         public void close() throws Exception;
+
+        /**
+         * Rilascia il documento PDF (handle file) per operazioni come salvataggio in-place, mantenendo
+         * l'ultima pagina disegnata visibile fino a {@link #open}/{@link #reopen}. Implementazione predefinita: {@link #close()}.
+         */
+        default void closeForSaveReleasingFile() throws Exception {
+            close();
+        }
 
         // Naviagtion methods
         public void goToFirstPage();
@@ -68,6 +77,12 @@ public interface IPdfView {
         public int getNumPages();
         public FitType getFitType();
         public int getPageNumber();
+
+        /**
+         * Documento PDFBox associato alla vista aperta, oppure {@code null} se nessun file è caricato,
+         * oppure se l'implementazione non espone un {@link PDDocument} (es. adapter non PDFBox).
+         */
+        public PDDocument getPdDocument();
 
         // Listeners
         public void addPageChangedListener(PageChangedListener listener);

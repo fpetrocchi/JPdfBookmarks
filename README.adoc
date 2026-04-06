@@ -17,7 +17,7 @@ jpdfbookmarks code-r213 branches pdfbox
 
 == Build System requirement
 
-* JDK 9.x (JDK 9+)
+* JDK 21 (LTS) or newer
 * Maven 3.6.x+
 
 == How to build and package ?

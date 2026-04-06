@@ -46,6 +46,16 @@ public interface IBookmarksConverter {
     public void open(String pdfPath) throws IOException;
     public void open(String path, byte[] bytes) throws IOException;
 
+    /**
+     * Apre il PDF da byte in RAM senza tenere un handle sul file a {@code logicalFilePath}
+     * (utile mentre un viewer tiene aperto lo stesso PDF). {@link #getOpenedFilePath()} deve
+     * restituire {@code logicalFilePath} per risolvere percorsi relativi nei segnalibri.
+     */
+    default void openFromPdfBytes(byte[] pdfBytes, String logicalFilePath, byte[] password)
+            throws IOException {
+        throw new UnsupportedOperationException("openFromPdfBytes");
+    }
+
     public void createUnencryptedCopy(File tmpFile) throws IOException;
 
     /**

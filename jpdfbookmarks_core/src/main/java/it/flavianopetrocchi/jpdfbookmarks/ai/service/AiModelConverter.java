@@ -1,0 +1,83 @@
+package it.flavianopetrocchi.jpdfbookmarks.ai.service;
+
+import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
+import it.flavianopetrocchi.jpdfbookmarks.bookmark.Bookmark;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Maps AI/LLM bookmark DTOs ({@link AiBookmark}) to the Swing/PDF {@link Bookmark} tree used by JPdfBookmarks.
+ * <p>
+ * {@link Bookmark} extends {@link javax.swing.tree.DefaultMutableTreeNode}; child nodes are attached with
+ * {@link Bookmark#add(javax.swing.tree.MutableTreeNode)} (same pattern as {@code cloneBookmarkWithChildren}).
+ */
+public final class AiModelConverter {
+
+    private AiModelConverter() {
+    }
+
+    /**
+     * Converts each top-level {@link AiBookmark} into a root {@link Bookmark}. Order is preserved.
+     * {@code null} input or entries are skipped where noted.
+     *
+     * @param aiBookmarks roots of one or more trees; may be {@code null} or contain {@code null} elements
+     * @param offset      value added to each {@link AiBookmark#getPageNumber()} that is {@code > 0} when setting the
+     *                    destination page on {@link Bookmark} (correction after raw AI extraction)
+     * @return mutable list of native bookmarks (empty if input is null or empty)
+     */
+    public static List<Bookmark> toAppBookmarks(List<AiBookmark> aiBookmarks, int offset) {
+        if (aiBookmarks == null || aiBookmarks.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Bookmark> roots = new ArrayList<>(aiBookmarks.size());
+        for (AiBookmark ai : aiBookmarks) {
+            if (ai != null) {
+                roots.add(toAppBookmark(ai, offset));
+            }
+        }
+        return roots;
+    }
+
+    /**
+     * Converte un sottoalbero {@link AiBookmark} senza scostamento di pagina ({@code offset = 0}).
+     *
+     * @param ai radice non null dell'albero da convertire
+     */
+    public static Bookmark toAppBookmark(AiBookmark ai) {
+        return toAppBookmark(ai, 0);
+    }
+
+    /**
+     * Converte un sottoalbero {@link AiBookmark} in {@link Bookmark}. Per ogni nodo, se {@code page_number &gt; 0},
+     * il valore scritto sul segnalibro è {@code page_number + offset}; altrimenti il numero resta quello dell'IA (es. -1).
+     *
+     * @param ai     radice non null dell'albero da convertire
+     * @param offset intero sommato ai soli {@code page_number} positivi (correzione applicata lato applicazione)
+     */
+    public static Bookmark toAppBookmark(AiBookmark ai, int offset) {
+        Objects.requireNonNull(ai, "ai");
+        Bookmark node = new Bookmark();
+        String title = ai.getTitle();
+        if (title != null && !title.isEmpty()) {
+            node.setTitle(title);
+        }
+        Integer pageNumber = ai.getPageNumber();
+        if (pageNumber != null) {
+            if (pageNumber > 0) {
+                node.setPageNumber(pageNumber + offset);
+            } else {
+                node.setPageNumber(pageNumber);
+            }
+        }
+        List<AiBookmark> children = ai.getChildren();
+        if (children != null) {
+            for (AiBookmark child : children) {
+                if (child != null) {
+                    node.add(toAppBookmark(child, offset));
+                }
+            }
+        }
+        return node;
+    }
+}

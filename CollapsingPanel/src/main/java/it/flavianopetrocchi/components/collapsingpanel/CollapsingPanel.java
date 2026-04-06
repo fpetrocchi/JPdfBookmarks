@@ -180,19 +180,27 @@ public class CollapsingPanel extends JPanel {
     public int setPanelState(int state) {
         int oldState = this.state;
         if (state == PANEL_COLLAPSED) {
-            if (!firstRestore) {
-                dividerLocation = containerSplitter.getDividerLocation();
-            } else {
-                firstRestore = false;
+            if (oldState == PANEL_OPENED) {
+                if (!firstRestore) {
+                    dividerLocation = containerSplitter.getDividerLocation();
+                } else {
+                    firstRestore = false;
+                }
+                containerSplitter.setLeftComponent(openLeftPanelContainer);
+                containerSplitter.setOneTouchExpandable(false);
+                containerSplitter.setEnabled(false);
             }
-            containerSplitter.setLeftComponent(openLeftPanelContainer);
-            containerSplitter.setOneTouchExpandable(false);
-            containerSplitter.setEnabled(false);
         } else {
-            containerSplitter.setDividerLocation(dividerLocation);
-            containerSplitter.setLeftComponent(CollapsingPanel.this);
-            containerSplitter.setOneTouchExpandable(true);
-            containerSplitter.setEnabled(true);
+            if (oldState == PANEL_COLLAPSED) {
+                if (dividerLocation >= 0) {
+                    containerSplitter.setDividerLocation(dividerLocation);
+                }
+                containerSplitter.setLeftComponent(CollapsingPanel.this);
+                containerSplitter.setOneTouchExpandable(true);
+                containerSplitter.setEnabled(true);
+            }
+            // If already OPEN, do not call setLeftComponent again — JSplitPane resets the divider
+            // when the left component is reassigned even to the same instance.
         }
         this.state = state;
         return oldState;
@@ -207,9 +215,16 @@ public class CollapsingPanel extends JPanel {
 
     public void setDividerLocation(int location) {
         dividerLocation = location;
-//        if (state == PANEL_OPENED) {
-//            containerSplitter.setDividerLocation(dividerLocation);
-//        }
+        if (location < 0) {
+            return;
+        }
+        if (state == PANEL_OPENED) {
+            SwingUtilities.invokeLater(() -> {
+                if (state == PANEL_OPENED && dividerLocation >= 0) {
+                    containerSplitter.setDividerLocation(dividerLocation);
+                }
+            });
+        }
     }
 
     public void updateComponentsUI() {

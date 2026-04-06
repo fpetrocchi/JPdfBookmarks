@@ -96,6 +96,10 @@ import java.awt.Color;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -196,6 +200,25 @@ public class iTextBookmarksConverter implements IBookmarksConverter {
         } else {
             reader = new PdfReader(pdfPath);
         }
+        applyViewerPreferencesFromReader();
+    }
+
+    @Override
+    public void openFromPdfBytes(byte[] pdfBytes, String logicalFilePath, byte[] password)
+            throws IOException {
+        if (reader != null) {
+            close();
+        }
+        this.filePath = logicalFilePath;
+        if (password != null) {
+            reader = new PdfReader(pdfBytes, password);
+        } else {
+            reader = new PdfReader(pdfBytes);
+        }
+        applyViewerPreferencesFromReader();
+    }
+
+    private void applyViewerPreferencesFromReader() {
         int preferences = reader.getSimpleViewerPreferences();
         if ((preferences & PdfWriter.PageModeUseOutlines) == 0) {
             showOnOpen = false;
@@ -397,11 +420,28 @@ public class iTextBookmarksConverter implements IBookmarksConverter {
                 tmpReader = new PdfReader(tmp.getPath());
             }
 
-            stamper = new PdfStamper(tmpReader, new FileOutputStream(path));
+            boolean replaceInPlace = Ut.samePhysicalFile(path, this.filePath);
+            if (replaceInPlace && reader != null) {
+                reader.close();
+                reader = null;
+            }
+
+            File stamperOutFile;
+            OutputStream stamperStream;
+            if (replaceInPlace) {
+                stamperOutFile = File.createTempFile("jpdf-out", ".pdf");
+                stamperOutFile.deleteOnExit();
+                stamperStream = new FileOutputStream(stamperOutFile);
+            } else {
+                stamperOutFile = null;
+                stamperStream = new FileOutputStream(path);
+            }
+
+            stamper = new PdfStamper(tmpReader, stamperStream);
             if (outline != null) {
                 stamper.setOutlines(outline);
             }
-            int preferences = reader.getSimpleViewerPreferences();
+            int preferences = tmpReader.getSimpleViewerPreferences();
             if (showOnOpen) {
                 preferences |= PdfWriter.PageModeUseOutlines;
             } else {
@@ -418,7 +458,15 @@ public class iTextBookmarksConverter implements IBookmarksConverter {
                         tmpReader.getPermissions(), tmpReader.getCryptoMode());
             }
             stamper.close();
+            stamper = null;
             tmp.delete();
+
+            if (replaceInPlace && stamperOutFile != null) {
+                Files.move(
+                        stamperOutFile.toPath(),
+                        Paths.get(path),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (DocumentException ex) {
         }
     }

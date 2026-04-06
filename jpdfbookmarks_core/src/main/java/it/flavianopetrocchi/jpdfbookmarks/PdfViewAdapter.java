@@ -39,6 +39,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -221,6 +222,11 @@ public class PdfViewAdapter extends JScrollPane implements IPdfView {
 
     public int getPageNumber() {
         return currentPage + 1;
+    }
+
+    @Override
+    public PDDocument getPdDocument() {
+        return null;
     }
 
     public FitType getFitType() {

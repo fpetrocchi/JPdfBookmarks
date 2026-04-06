@@ -60,7 +60,7 @@
               <errTitle>JPdfBookmarks</errTitle>
               <chdir/>
               <priority>normal</priority>
-              <downloadUrl>https://adoptium.net/?variant=openjdk17</downloadUrl>
+              <downloadUrl>https://adoptium.net/temurin/releases/?version=21</downloadUrl>
               <supportUrl>http://flavianopetrocchi.blogspot.com/</supportUrl>
               <customProcName>false</customProcName>
               <stayAlive>true</stayAlive>
@@ -68,7 +68,7 @@
               <icon/>
               <jre>
                 <path/>
-                <minVersion>1.9.0</minVersion>
+                <minVersion>21.0.0</minVersion>
                 <maxVersion/>
                 <jdkPreference>preferJre</jdkPreference>
                 <runtimeBits>64/32</runtimeBits>
@@ -89,7 +89,7 @@
               <errTitle>JPdfBookmarks</errTitle>
               <chdir/>
               <priority>normal</priority>
-              <downloadUrl>https://adoptium.net/?variant=openjdk17</downloadUrl>
+              <downloadUrl>https://adoptium.net/temurin/releases/?version=21</downloadUrl>
               <supportUrl>http://flavianopetrocchi.blogspot.com/</supportUrl>
               <customProcName>false</customProcName>
               <stayAlive>false</stayAlive>
@@ -97,7 +97,7 @@
               <icon>src/main/images/jpdfbookmarks.ico</icon>
               <jre>
                 <path/>
-                <minVersion>1.9.0</minVersion>
+                <minVersion>21.0.0</minVersion>
                 <maxVersion/>
                 <jdkPreference>preferJre</jdkPreference>
                 <runtimeBits>64/32</runtimeBits>
@@ -182,6 +182,35 @@
     <dependency>
       <groupId>it.flavianopetrocchi.jpdfbookmarks</groupId>
       <artifactId>iTextBookmarksConverter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>fontbox</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox-tools</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-open-ai</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-ollama</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-spring-boot-starter</artifactId>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 </project>

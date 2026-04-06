@@ -16,7 +16,7 @@ JPdfBookmarks 3.0.2 最大修改是讓 JPdfBookmarks GUI 的 Bookmarks 可以顯
 
 === 系統需求
 
-JRE / JDK 9.0+ (包含 9.0 或是 11, ... , 17)
+JRE / JDK 21 (LTS) 或更新版本
 
 === 下載安裝檔
 
@@ -96,17 +96,17 @@ jpdfbookmarks.exe 與 jpdfbookmarks_cli.exe 都能帶出 GUI 模式
 ====
 
 ==== Windows 上的 JRE 或 JDK
-點擊　`jpdfbookmarks.exe` 或是 `jpdfbookmarks_cli.exe`，如果跳出 對話窗顯示訊息 **This application requires a Java Runtime Environment 1.9.0** 表示你沒有安裝 JRE 9 或 JDK 9。
+點擊　`jpdfbookmarks.exe` 或是 `jpdfbookmarks_cli.exe`，如果跳出對話窗顯示需要 Java Runtime Environment **21**（或類似版本提示），表示你沒有安裝 JRE 21 或 JDK 21。
 
 
 [IMPORTANT]
 .下載 JRE/JDK
 ====
-鑒於 Oracle 的 JRE/JDK 授權爭議問題，我將 jpdfbookmarks.exe / jpdfbookmarks_cli.exe 提示安裝 JRE/JDK 的下載網址改為 https://adoptium.net/releases.html
+鑒於 Oracle 的 JRE/JDK 授權爭議問題，我將 jpdfbookmarks.exe / jpdfbookmarks_cli.exe 提示安裝 JRE/JDK 的下載網址改為 https://adoptium.net/temurin/releases/?version=21
 
 建議你可以選擇:
 
-* Temurin 17(LTS)
+* Temurin 21 (LTS)
 * Windows
 * x64
 
@@ -117,7 +117,7 @@ image:adoptium-net-jdk.png[]
 
 ==== 安裝 JRE
 
-點擊 `OpenJDK17U-jre_x64_windows_hotspot_17.0.2_8.msi`
+點擊下載的 Temurin 21 **JRE .msi**（檔名類似 `OpenJDK21U-jre_x64_windows_hotspot_...msi`）
 出現視窗後 , 點選 **[Next]**
 
 image:jre_install_001.png[]
@@ -135,7 +135,7 @@ image:jre_install_003.png[]
 
 確認都已經勾選後 , 就可以點擊 **[Next]**
 
-Q: 為何你已經安裝了非Oracle的JRE/JDK,執行 jpdfbookmarks.exe / jpdfbookmarks_cli.exe 還是會跳出 對話窗顯示訊息 **This application requires a Java Runtime Environment 1.8.0** 表示你沒有安裝 JRE 8 或 JDK 8。難道只能裝 Oracle的 JRE 嗎? 還是只能安裝 8的版本?
+Q: 為何你已經安裝了非 Oracle 的 JRE/JDK，執行 jpdfbookmarks.exe / jpdfbookmarks_cli.exe 還是會跳出對話窗顯示需要 **Java Runtime Environment 21**（或類似版本）？難道只能裝 Oracle 的 JRE 嗎？
 
 [TIP]
 ====
@@ -163,34 +163,15 @@ image:jre_install_006.png[]
 image:jre_install_007.png[]
 
 
-注意: 安裝 JRE 或 JDK 的版本,建議使用 17版
-
-
-[source,bash]
-.使用 JRE 11 執行 jpdfbookmarks_cli 會拋出警告訊息
-----
-C:\TOOLS\jpdfbookmarks-3.0.2>jpdfbookmarks_cli README-zh_CN.pdf -e UTF-8 -d -o ttt.txt
-WARNING: An illegal reflective access operation has occurred
-WARNING: Illegal reflective access by com.lowagie.text.pdf.MappedRandomAccessFile$1 (file:/C:/TOOLS/jpdfbookmarks-3.0.2/lib/iText-2.1.7-patched-3.0.2.jar) to method java.nio.DirectByteBuffer.cleaner()
-WARNING: Please consider reporting this to the maintainers of com.lowagie.text.pdf.MappedRandomAccessFile$1
-WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
-WARNING: All illegal access operations will be denied in a future release
-
-C:\TOOLS\jpdfbookmarks-3.0.2>java -version
-openjdk version "11.0.14.1" 2022-02-08
-OpenJDK Runtime Environment Temurin-11.0.14.1+1 (build 11.0.14.1+1)
-OpenJDK 64-Bit Server VM Temurin-11.0.14.1+1 (build 11.0.14.1+1, mixed mode)
-----
+注意: 安裝 JRE 或 JDK 的版本須為 **21** 或更高（建議 Temurin 21 LTS）。
 
 [source,bash]
-.使用 JRE 17 執行 jpdfbookmarks_cli 不會拋出警告訊息
+.使用 JRE 21 執行時請確認版本
 ----
-C:\TOOLS\jpdfbookmarks-3.0.2>jpdfbookmarks_cli README-zh_CN.pdf -e UTF-8 -d -o ttt.txt
-
 C:\TOOLS\jpdfbookmarks-3.0.2>java -version
-openjdk version "17.0.2" 2022-01-18
-OpenJDK Runtime Environment Temurin-17.0.2+8 (build 17.0.2+8)
-OpenJDK 64-Bit Server VM Temurin-17.0.2+8 (build 17.0.2+8, mixed mode, sharing)
+openjdk version "21.0.x" ...
+OpenJDK Runtime Environment Temurin-21... (build 21.0.x+...)
+OpenJDK 64-Bit Server VM Temurin-21... (build 21.0.x+..., mixed mode, sharing)
 ----
 
 == 如何執行使用 JPdfBookmarks?

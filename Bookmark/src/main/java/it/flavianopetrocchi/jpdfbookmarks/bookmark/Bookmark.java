@@ -436,7 +436,7 @@ public class Bookmark extends DefaultMutableTreeNode implements Serializable {
         int pageSepIndex = findPageSepIndex(buffer.toString(), attributeSep, pageSep);
 
         StringTokenizer tokenizer = new StringTokenizer(
-                buffer.substring(pageSepIndex + pageSep.length()), attributeSep);
+                skipLeadingWhitespace(buffer.substring(pageSepIndex + pageSep.length())), attributeSep);
         String[] attributes = new String[tokenizer.countTokens()];
         for (int i = 0; tokenizer.hasMoreTokens(); i++) {
             attributes[i] = tokenizer.nextToken();
@@ -676,6 +676,14 @@ public class Bookmark extends DefaultMutableTreeNode implements Serializable {
         return typeIndex;
     }
 
+    private static String skipLeadingWhitespace(String s) {
+        int i = 0;
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) {
+            i++;
+        }
+        return s.substring(i);
+    }
+
     private static int findPageSepIndex(String line, String attributesSeparator, String pageSeparator) {
         //if there is a GoToFile or Launch or Uri we must be sure the pageSeparator is
         //before the bookmark type attribute otherwise could be a path separator
@@ -712,7 +720,8 @@ public class Bookmark extends DefaultMutableTreeNode implements Serializable {
 
         if (pageSepIndex != -1) {
             title = line.substring(0, pageSepIndex);
-            attributes = line.substring(pageSepIndex + pageSeparator.length());
+            attributes = skipLeadingWhitespace(
+                    line.substring(pageSepIndex + pageSeparator.length()));
         } else {
             wellFormed = false;
         }
@@ -731,7 +740,7 @@ public class Bookmark extends DefaultMutableTreeNode implements Serializable {
         }
 
         try {
-            bookmark.setPageNumber(Integer.parseInt(tokens[PAGE]));
+            bookmark.setPageNumber(Integer.parseInt(tokens[PAGE].trim()));
         } catch (Exception e) {
             wellFormed = false;
         }

@@ -64,6 +64,7 @@ import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
 
 // PDFBox components
+import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -102,6 +103,13 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
     private PDFRenderer renderer;
     private BufferedImage pageImage, seImage;
 
+    /** Copia della pagina mostrata mentre il file è chiuso per salvataggio in-place. */
+    private BufferedImage savePresentationSnapshot;
+    /** Pagina da ripristinare dopo {@link #reopen}; -1 = nessuno. */
+    private int pendingRestorePageIndex = -1;
+    /** Scroll del viewport prima dello snapshot di salvataggio (ripristino dopo il layout). */
+    private Point scrollBeforeSaveSnapshot;
+
     private int top = -1;
     private int left = -1;
     private final int bottom = -1;
@@ -138,6 +146,7 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
     private String copiedText;
     private Boolean connectToClipboard = false;
     private ThumbnailsPane thumbnails;
+    private final ThumbnailListener thumbnailActionListener = new ThumbnailListener();
     private JScrollBar vbar;// </editor-fold>
 
     /**
@@ -188,35 +197,44 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
      */
     @Override
     public void open(File file, String password) throws IOException {
+        MemoryUsageSetting noUserPathMapping = MemoryUsageSetting.setupTempFileOnly();
         if (password != null) {
-            document = PDDocument.load(file, password);
+            document = PDDocument.load(file, password, noUserPathMapping);
         } else {
-            document = PDDocument.load(file);
+            document = PDDocument.load(file, noUserPathMapping);
         }
         /**
          * Code past this point will only be executed If there is a document to
          * view. An exception is thrown if the document cannot be loaded.
          */
         renderer = new PDFRenderer(document);
-        thumbnails = new ThumbnailsPane(document);
-        addPageChangedListener(thumbnails);
+        if (thumbnails == null) {
+            thumbnails = new ThumbnailsPane(document);
+            addPageChangedListener(thumbnails);
+            thumbnails.setupThumbnails();
+        } else {
+            thumbnails.resetForDocument(document);
+        }
 
         numberOfPages = document.getNumberOfPages();
         // if there's actually a first page, get it
         page = numberOfPages > 0 ? document.getPage(0) : null;
         updateCurrentPageBoxes();
 
-        /**
-         * Fill in the the thumbnails.
-         */
-        thumbnails.setupThumbnails();
-        /**
-         * Attach the ThumbnailListener to each thumbnail button.
-         */
-        ThumbnailListener tl = new ThumbnailListener();
         for (ThumbnailButton tb : thumbnails.getThumbnailButtons()) {
-            tb.addActionListener(tl);
+            tb.addActionListener(thumbnailActionListener);
         }
+
+        if (pendingRestorePageIndex >= 0 && numberOfPages > 0) {
+            int p = min(pendingRestorePageIndex, numberOfPages - 1);
+            pendingRestorePageIndex = -1;
+            goToPageIndex(p);
+        } else {
+            pendingRestorePageIndex = -1;
+        }
+        savePresentationSnapshot = null;
+        scrollBeforeSaveSnapshot = null;
+        rendererPanel.repaint();
     }
 
     /**
@@ -233,28 +251,117 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
 
     @Override
     public JScrollPane getThumbnails() {
-        return (JScrollPane) thumbnails;
+        return thumbnails;
     }
 
     @Override
     public void reopen(File file) throws Exception {
-        int pageCurrentlyDisplayed = pageIndex;
-        close();
-        pageIndex = pageCurrentlyDisplayed;
+        int savedPage = pageIndex >= 0 ? pageIndex : 0;
+        pendingRestorePageIndex = savedPage;
+        if (document != null) {
+            savePresentationSnapshot = null;
+            if (thumbnails != null) {
+                thumbnails.setThumbnailGenSuspended(true);
+            }
+            document.close();
+            document = null;
+            page = null;
+            renderer = null;
+            setCopiedText(null);
+        }
         open(file);
     }
 
     @Override
     public void close() throws IOException {
+        savePresentationSnapshot = null;
+        scrollBeforeSaveSnapshot = null;
+        pendingRestorePageIndex = -1;
         if (document == null) {
+            rendererPanel.repaint();
             return;
         }
         document.close();
         document = null;
-        thumbnails = null;
+        if (thumbnails != null) {
+            removePageChangedListener(thumbnails);
+            thumbnails = null;
+        }
+        page = null;
+        renderer = null;
         pageIndex = -1;
         setCopiedText(null);
         rendererPanel.repaint();
+    }
+
+    /**
+     * Chiude il PDF su disco senza azzerare la vista: resta visibile un'istantanea dell'ultimo rendering.
+     */
+    @Override
+    public void closeForSaveReleasingFile() throws IOException {
+        scrollBeforeSaveSnapshot = new Point(getViewport().getViewPosition());
+        captureSavePresentationSnapshot();
+        if (thumbnails != null) {
+            thumbnails.setThumbnailGenSuspended(true);
+        }
+        if (document != null) {
+            document.close();
+            document = null;
+        }
+        page = null;
+        renderer = null;
+        setCopiedText(null);
+        // No repaint qui: il buffer Swing resta l’ultimo frame del PDF finché non serve un ridisegno
+        // (evita lampo “chiuso/riaperto” durante salvataggio in-place).
+    }
+
+    private void restoreViewportClamped(Point target) {
+        if (target == null) {
+            return;
+        }
+        Dimension extent = viewport.getExtentSize();
+        Dimension view = rendererPanel.getSize();
+        int maxX = max(0, view.width - extent.width);
+        int maxY = max(0, view.height - extent.height);
+        int x = min(max(target.x, 0), maxX);
+        int y = min(max(target.y, 0), maxY);
+        viewport.setViewPosition(new Point(x, y));
+    }
+
+    private void captureSavePresentationSnapshot() {
+        BufferedImage src = null;
+        if (fitType == FitType.FitRect || Boolean.TRUE.equals(textSelectionActive)) {
+            if (seImage != null) {
+                src = seImage;
+            } else if (pageImage != null) {
+                src = pageImage;
+            }
+        } else if (pageImage != null) {
+            src = pageImage;
+        }
+        if (src != null) {
+            savePresentationSnapshot = copyBufferedImage(src);
+        } else if (document != null && renderer != null && numberOfPages > 0) {
+            try {
+                savePresentationSnapshot = renderer.renderImage(pageIndex, scale);
+            } catch (IOException e) {
+                JPdfBookmarks.printErrorForDebug(e);
+            }
+        }
+    }
+
+    private static BufferedImage copyBufferedImage(BufferedImage src) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        int type = src.getType();
+        if (type == BufferedImage.TYPE_CUSTOM || type == 0) {
+            type = BufferedImage.TYPE_INT_ARGB;
+        }
+        BufferedImage copy = new BufferedImage(w, h, type);
+        Graphics2D g = copy.createGraphics();
+        g.drawImage(src, 0, 0, null);
+        g.dispose();
+        return copy;
     }
 
     class PdfViewMouseWheelListener implements MouseWheelListener {
@@ -504,6 +611,14 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
     @Override
     public int getPageNumber() {
         return pageIndex + 1;
+    }
+
+    /**
+     * Modello PDFBox del file corrente, oppure {@code null} dopo {@link #close()} o prima di un {@link #open}.
+     */
+    @Override
+    public PDDocument getPdDocument() {
+        return document;
     }
 
     @Override
@@ -980,6 +1095,30 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
             super.paintComponent(g);
 
             if (document == null || page == null) {
+                if (savePresentationSnapshot != null) {
+                    Graphics2D g2 = (Graphics2D) g;
+                    Dimension snapDim = new Dimension(
+                            savePresentationSnapshot.getWidth(),
+                            savePresentationSnapshot.getHeight());
+                    Dimension cur = getPreferredSize();
+                    boolean layoutChanged = cur == null
+                            || cur.width != snapDim.width
+                            || cur.height != snapDim.height;
+                    if (layoutChanged) {
+                        setPreferredSize(snapDim);
+                        revalidate();
+                        final Point rp = scrollBeforeSaveSnapshot;
+                        if (rp != null) {
+                            SwingUtilities.invokeLater(() -> {
+                                JPDFBoxViewPanel.this.restoreViewportClamped(rp);
+                                SwingUtilities.invokeLater(
+                                        () -> JPDFBoxViewPanel.this.restoreViewportClamped(rp));
+                            });
+                        }
+                    }
+                    g2.drawImage(savePresentationSnapshot, 0, 0, this);
+                    return;
+                }
                 setPreferredSize(viewport.getSize());
                 revalidate();
                 return;

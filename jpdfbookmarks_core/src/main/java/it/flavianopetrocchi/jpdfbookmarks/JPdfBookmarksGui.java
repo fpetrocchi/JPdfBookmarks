@@ -22,6 +22,8 @@
 package it.flavianopetrocchi.jpdfbookmarks;
 
 // <editor-fold defaultstate="collapsed" desc="import">
+import it.flavianopetrocchi.jpdfbookmarks.ai.AiOrchestratorFactory;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
 import it.flavianopetrocchi.jpdfbookmarks.bookmark.Bookmark;
 import it.flavianopetrocchi.jpdfbookmarks.bookmark.IBookmarksConverter;
 import it.flavianopetrocchi.jpdfbookmarks.bookmark.BookmarkType;
@@ -83,6 +85,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.net.Authenticator;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
@@ -95,6 +99,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -244,8 +249,15 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     private final HashMap<String, JToolBar> mainToolbars = new HashMap<>();
     private final HashMap<String, JToolBar> bookmarksToolbars = new HashMap<>();
     private final JPanel mainToolbarsPanel = new JPanel(new WrapFlowLayout(WrapFlowLayout.LEFT));
+    private JToolBar aiToolbar;
+    private JCheckBoxMenuItem viewAiToolbarMenuItem;
+    private final LinkedHashMap<String, JCheckBoxMenuItem> viewToolbarVisibilityToggles =
+            new LinkedHashMap<>();
+    private boolean suppressViewToolbarVisibilityCallback;
     private MouseAdapter mouseAdapter;
     private final ToolbarsPopupListener toolbarsPopupListener = new ToolbarsPopupListener();
+    /** Ultimi valori del dialogo IA indice; azzerato a ogni apertura di un nuovo file. */
+    private AiIndexBookmarksDialog.AiIndexDialogMemory aiIndexDialogMemory;
     private LeftPanel leftPanel;
     private ButtonGroup leftPanelMenuGroup;// </editor-fold>
     // <editor-fold defaultstate="collapsed" desc="Actions">
@@ -293,6 +305,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     private Action addLaunchLinkAction;
     private Action showActionsDialog;
     private Action applyPageOffset;
+    private Action generateBookmarksFromIndexAiAction;
     private Action optionsDialogAction;
     private Action checkUpdatesAction;
     private Action readOnlineManualAction;
@@ -508,7 +521,9 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
                     selectText, connectToClipboard, openLinkedPdf, copyBookmarkFromViewAction);
             if (evt.getOperation() == FileOperationEvent.Operation.FILE_OPENED) {
                 Ut.enableActions(true, saveAsAction, extractLinks);
+                aiIndexDialogMemory = null;
             }
+            refreshGenerateBookmarksFromIndexAiActionEnabled();
             tbShowOnOpen.setSelected(fileOperator.getShowBookmarksOnOpen());
             cbShowOnOpen.setSelected(fileOperator.getShowBookmarksOnOpen());
             switch (viewPanel.getFitType()) {
@@ -556,15 +571,14 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
                     showOnOpenAction, setBoldAction, setItalicAction,
                     renameAction, setDestFromViewAction, changeColorAction,
                     dumpAction, loadAction, addWebLinkAction, addLaunchLinkAction, saveAction,
-                    applyPageOffset, selectText, connectToClipboard, showActionsDialog, openLinkedPdf,
-                    copyBookmarkFromViewAction, extractLinks);
+                    applyPageOffset, generateBookmarksFromIndexAiAction, selectText, connectToClipboard,
+                    showActionsDialog, openLinkedPdf, copyBookmarkFromViewAction, extractLinks);
             lblMouseOverNode.setText(" ");
             lblSelectedNode.setText(" ");
             lblCurrentView.setText(" ");
             setEmptyBookmarksTree();
 //            leftPanel.addThumbnailsPanel(new JPanel());
-            updateThumbnailsPanel(null);
-            leftPanel.setPanelState(leftPanel.getPanelState());
+            updateThumbnailsPanel(null, LeftPanel.ThumbnailsUpdateMode.REPLACE_AND_REPAINT);
             undoManager.die();
         } else if (evt.getOperation() == FileOperationEvent.Operation.FILE_CHANGED) {
             if (fileOperator.getFileChanged() && !fileOperator.isReadonly()) {
@@ -924,7 +938,8 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
                             viewPanel.goToFirstPage();
                         }
                     });
-                    updateThumbnailsPanel(fileOperator.getViewPanel().getThumbnails());
+                    updateThumbnailsPanel(fileOperator.getViewPanel().getThumbnails(),
+                            LeftPanel.ThumbnailsUpdateMode.REPLACE_AND_REPAINT);
                 } catch (InterruptedException | ExecutionException ex) {
                     showErrorMessage(Res.getString("ERROR_OPENING_FILE") + " "
                             + file.getName());
@@ -937,8 +952,35 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         opener.execute();
     }
 
-    private void updateThumbnailsPanel(JScrollPane thumbnails) {
-        leftPanel.updateThumbnails(thumbnails);
+    private void updateThumbnailsPanel(JScrollPane thumbnails, LeftPanel.ThumbnailsUpdateMode mode) {
+        int savedDivider = -1;
+        if (leftPanel.getPanelState() == CollapsingPanel.PANEL_OPENED) {
+            savedDivider = centralSplit.getDividerLocation();
+        }
+        leftPanel.updateThumbnails(thumbnails, mode);
+        if (savedDivider >= 0) {
+            final int loc = savedDivider;
+            SwingUtilities.invokeLater(() -> {
+                if (leftPanel.getPanelState() == CollapsingPanel.PANEL_OPENED) {
+                    centralSplit.setDividerLocation(loc);
+                }
+            });
+        }
+    }
+
+    /** When the Anteprime tab is shown, align thumbnail scroll with the page shown in the main viewer. */
+    private void scrollThumbnailsToCurrentPage() {
+        if (viewPanel == null) {
+            return;
+        }
+        JScrollPane tsp = viewPanel.getThumbnails();
+        if (!(tsp instanceof ThumbnailsPane)) {
+            return;
+        }
+        int p = txtGoToPage.getInteger();
+        if (p >= 1) {
+            ((ThumbnailsPane) tsp).scrollPageThumbIntoView(p);
+        }
     }
 
     private void recreateNodesOpenedState() {
@@ -1479,20 +1521,19 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
             return;
         }
 
+        IBookmarksConverter converter = Bookmark.getBookmarksConverter();
+        if (converter == null) {
+            showErrorMessage(Res.getString("ERROR_BOOKMARKS_CONVERTER_NOT_FOUND"));
+            return;
+        }
         try {
-//            IBookmarksConverter converter =
-//                    new iTextBookmarksConverter(fileOperator.getFilePath());
-            IBookmarksConverter converter = Bookmark.getBookmarksConverter();
-            if (converter == null) {
-                showErrorMessage(Res.getString("ERROR_BOOKMARKS_CONVERTER_NOT_FOUND"));
-                throw new Exception();
-            }
-            converter.open(fileOperator.getFilePath(), fileOperator.getPassword());
+            byte[] pdfBytes = Files.readAllBytes(Paths.get(fileOperator.getFilePath()));
+            converter.openFromPdfBytes(pdfBytes, fileOperator.getFilePath(),
+                    fileOperator.getPassword());
             Bookmark root = Bookmark.outlineFromFile(converter,
                     file.getAbsolutePath(), userPrefs.getIndentationString(),
                     userPrefs.getPageSeparator(),
                     userPrefs.getAttributesSeparator(), userPrefs.getCharsetEncoding());
-            converter.close();
             UndoableLoadBookmarks undoableLoad = new UndoableLoadBookmarks(
                     bookmarksTreeModel, bookmarksTree, root);
             undoableLoad.doEdit();
@@ -1502,6 +1543,11 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         } catch (Exception ex) {
             System.out.println(ex.getMessage());
             showErrorMessage(Res.getString("ERROR_LOADING_TEXT_FILE"));
+        } finally {
+            try {
+                converter.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 
@@ -1706,6 +1752,76 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
             JOptionPane.showMessageDialog(this,
                     Res.getString("ERROR_SAVING_FILE"),
                     title, JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void refreshGenerateBookmarksFromIndexAiActionEnabled() {
+        boolean on = viewPanel != null && viewPanel.getPdDocument() != null;
+        generateBookmarksFromIndexAiAction.setEnabled(on);
+    }
+
+    /**
+     * Applica i segnalibri estratti dall'IA: in coda alla radice (come Incolla senza selezione) oppure
+     * sostituzione dell'intero albero (come caricamento da file testo). Aggiorna il modello e l'undo.
+     */
+    private void applyAiExtractedBookmarksFromIndex(List<Bookmark> roots, Boolean replaceAll) {
+        if (roots == null || roots.isEmpty()) {
+            return;
+        }
+        boolean replace = Boolean.TRUE.equals(replaceAll);
+        ArrayList<Bookmark> list = new ArrayList<>(roots);
+        if (replace) {
+            Bookmark newRoot = new Bookmark();
+            for (Bookmark b : list) {
+                newRoot.add(b);
+            }
+            UndoableLoadBookmarks undoableLoad =
+                    new UndoableLoadBookmarks(bookmarksTreeModel, bookmarksTree, newRoot);
+            undoableLoad.doEdit();
+            undoSupport.postEdit(undoableLoad);
+            bookmarksTreeModel.nodeStructureChanged((TreeNode) bookmarksTreeModel.getRoot());
+        } else {
+            Bookmark father = (Bookmark) bookmarksTreeModel.getRoot();
+            for (Bookmark b : list) {
+                father.add(b);
+            }
+            UndoablePasteBookmarks undoablePaste =
+                    new UndoablePasteBookmarks(bookmarksTreeModel, list);
+            undoablePaste.doEdit();
+            undoSupport.postEdit(undoablePaste);
+            bookmarksTreeModel.nodeStructureChanged(father);
+        }
+        fileOperator.setFileChanged(true);
+        recreateNodesOpenedState();
+    }
+
+    private void generateBookmarksFromIndexAiDialog() {
+        if (viewPanel == null || viewPanel.getPdDocument() == null) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    Res.getString("AI_INDEX_NO_DOCUMENT"),
+                    Res.getString("AI_INDEX_DIALOG_TITLE"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        try {
+            AiOrchestrator orchestrator = AiOrchestratorFactory.createOrchestrator(userPrefs);
+            AiIndexBookmarksDialog dlg =
+                    new AiIndexBookmarksDialog(
+                            this,
+                            viewPanel.getPdDocument(),
+                            viewPanel.getNumPages(),
+                            orchestrator,
+                            this::applyAiExtractedBookmarksFromIndex,
+                            aiIndexDialogMemory,
+                            state -> aiIndexDialogMemory = state);
+            dlg.setVisible(true);
+        } catch (IllegalStateException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    ex.getMessage(),
+                    Res.getString("AI_INDEX_ERROR_TITLE"),
+                    JOptionPane.WARNING_MESSAGE);
         }
     }
 
@@ -2079,6 +2195,16 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
                 applyPageOffsetDialog();
             }
         };
+
+        generateBookmarksFromIndexAiAction =
+                new ActionBuilder("ACTION_AI_GENERATE", "ACTION_AI_GENERATE_DESCR", null,
+                        "ai-edit.png", false) {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        generateBookmarksFromIndexAiDialog();
+                    }
+                };
 
         selectText = new ActionBuilder("ACTION_SELECT_TEXT",
                 "ACTION_SELECT_TEXT_DESCR",
@@ -2685,12 +2811,32 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         thumbnailsButton.addActionListener((ActionEvent e) -> {
             if (leftPanel != null) {
                 leftPanel.selectPanelToShow(Res.getString("THUMBNAILS_TAB_TITLE"));
+                scrollThumbnailsToCurrentPage();
             }
         });
         leftPanelMenuGroup.add(bookmarksButton);
         leftPanelMenuGroup.add(thumbnailsButton);
         menuView.add(bookmarksButton);
         menuView.add(thumbnailsButton);
+
+        menuView.addSeparator();
+        JMenu menuViewToolbars = new JMenu(Res.getString("MENU_VIEW_TOOLBARS"));
+        menuViewToolbars.setMnemonic(Res.mnemonicFromRes("MENU_VIEW_TOOLBARS_MNEMONIC"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_FILE_TB, "TOOLBAR_FILE"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_UNDO_TB, "TOOLBAR_UNDO"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_FITTYPE_TB, "TOOLBAR_FITTYPE"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_ZOOM_TB, "TOOLBAR_ZOOM"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_NAVIGATION_TB, "TOOLBAR_NAV"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_OTHERS_TB, "TOOLBAR_OTHERS"));
+        viewAiToolbarMenuItem = newViewToolbarVisibilityMenuItem(Prefs.SHOW_AI_TB, "TOOLBAR_AI");
+        menuViewToolbars.add(viewAiToolbarMenuItem);
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_WEB_TB, "TOOLBAR_WEB"));
+        menuViewToolbars.addSeparator();
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_ADD_TB, "TOOLBAR_ADD"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_CHANGE_TB, "TOOLBAR_CHANGE"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_STYLE_TB, "TOOLBAR_STYLE"));
+        menuViewToolbars.add(newViewToolbarVisibilityMenuItem(Prefs.SHOW_SETDEST_TB, "TOOLBAR_SETDEST"));
+        menuView.add(menuViewToolbars);
 
         menuBar.add(menuView);
 
@@ -2737,6 +2883,9 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
 
         item = menuTools.add(applyPageOffset);
         item.setMnemonic(Res.mnemonicFromRes("MENU_PAGE_OFFSET_MNEMONIC"));
+
+        item = menuTools.add(generateBookmarksFromIndexAiAction);
+        item.setMnemonic(Res.mnemonicFromRes("MENU_AI_GENERATE_MNEMONIC"));
 
         JCheckBoxMenuItem checkItem = new JCheckBoxMenuItem(Res.getString("MENU_CONVERT_NAMED_DEST"));
         checkItem.setToolTipText(Res.getString("MENU_CONVERT_NAMED_DEST_DESCR"));
@@ -3029,6 +3178,14 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         othersToolbar.add(applyPageOffset);
         othersToolbar.add(extractLinks);
 
+        aiToolbar = new JToolBar(Res.getString("TOOLBAR_AI"));
+        mainToolbars.put(Prefs.SHOW_AI_TB, aiToolbar);
+        JButton btnAiIndex = aiToolbar.add(generateBookmarksFromIndexAiAction);
+        btnAiIndex.setFocusable(false);
+        if (btnAiIndex.getIcon() != null) {
+            btnAiIndex.setText("");
+        }
+
         JToolBar webToolbar = new JToolBar();
         mainToolbars.put(Prefs.SHOW_WEB_TB, webToolbar);
         webToolbar.add(checkUpdatesAction);
@@ -3045,11 +3202,44 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         mainToolbarsPanel.add(zoomToolbar);
         mainToolbarsPanel.add(navigationToolbar);
         mainToolbarsPanel.add(othersToolbar);
+        mainToolbarsPanel.add(aiToolbar);
         mainToolbarsPanel.add(webToolbar);
 
         mainToolbarsPanel.addMouseListener(toolbarsPopupListener);
 
         return mainToolbarsPanel;
+    }
+
+    private JCheckBoxMenuItem newViewToolbarVisibilityMenuItem(String prefsKey, String textResKey) {
+        JCheckBoxMenuItem cb = new JCheckBoxMenuItem(Res.getString(textResKey));
+        cb.setSelected(userPrefs.getShowToolbar(prefsKey));
+        registerViewToolbarVisibilityToggle(prefsKey, cb);
+        return cb;
+    }
+
+    private void registerViewToolbarVisibilityToggle(String prefsKey, JCheckBoxMenuItem item) {
+        item.addActionListener(e -> {
+            if (suppressViewToolbarVisibilityCallback) {
+                return;
+            }
+            userPrefs.setShowToolbar(prefsKey, item.isSelected());
+            updateToolbars();
+        });
+        viewToolbarVisibilityToggles.put(prefsKey, item);
+    }
+
+    private void syncViewToolbarVisibilityMenuItems() {
+        suppressViewToolbarVisibilityCallback = true;
+        try {
+            for (Map.Entry<String, JCheckBoxMenuItem> e : viewToolbarVisibilityToggles.entrySet()) {
+                boolean show = userPrefs.getShowToolbar(e.getKey());
+                if (e.getValue().isSelected() != show) {
+                    e.getValue().setSelected(show);
+                }
+            }
+        } finally {
+            suppressViewToolbarVisibilityCallback = false;
+        }
     }
 
     public void updateToolbars() {
@@ -3083,6 +3273,7 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         }
         bookmarksToolbarsPanel.setVisible(foundVisibleToolbar);
 
+        syncViewToolbarVisibilityMenuItems();
     }
 
     private JPanel createStatusBar() {
@@ -3242,11 +3433,17 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         leftPanel.addBookmarksPanel(createBookmarksPanel());
         leftPanel.addThumbnailsPanel(createThumbnailsPanel());
         leftPanel.getComboBoxSelector().addItemListener((ItemEvent e) -> {
+            if (e.getStateChange() != ItemEvent.SELECTED) {
+                return;
+            }
             String item = (String) e.getItem();
             if (item.equals(Res.getString("BOOKMARKS_TAB_TITLE"))) {
                 bookmarksButton.setSelected(true);
             } else {
                 thumbnailsButton.setSelected(true);
+                if (item.equals(Res.getString("THUMBNAILS_TAB_TITLE"))) {
+                    scrollThumbnailsToCurrentPage();
+                }
             }
         });
         leftPanel.getComboBoxSelector().setSelectedItem(userPrefs.getPanelToShow());

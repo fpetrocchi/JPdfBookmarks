@@ -27,14 +27,19 @@ import it.flavianopetrocchi.jpdfbookmarks.bookmark.IBookmarksConverter;
 import it.flavianopetrocchi.jpdfbookmarks.bookmark.IBookmarksConverter.AnnotationRect;
 import it.flavianopetrocchi.utilities.FileOperationEvent;
 import it.flavianopetrocchi.utilities.FileOperationListener;
+import it.flavianopetrocchi.utilities.Ut;
 import java.awt.Component;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import javax.management.ServiceNotFoundException;
+import java.lang.reflect.InvocationTargetException;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 
@@ -230,12 +235,44 @@ public final class UnifiedFileOperator {
         return fileChanged;
     }
 
+    private void closeViewForSaveOnEventThread() throws Exception {
+        final Exception[] holder = new Exception[1];
+        Runnable task = () -> {
+            try {
+                viewPanel.closeForSaveReleasingFile();
+            } catch (Exception e) {
+                holder[0] = e;
+            }
+        };
+        if (SwingUtilities.isEventDispatchThread()) {
+            task.run();
+        } else {
+            try {
+                SwingUtilities.invokeAndWait(task);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while preparing save", e);
+            } catch (InvocationTargetException e) {
+                Throwable c = e.getCause();
+                if (c instanceof Exception) {
+                    throw (Exception) c;
+                }
+                throw new Exception(c);
+            }
+        }
+        if (holder[0] != null) {
+            throw holder[0];
+        }
+    }
+
     public boolean save(Bookmark root) {
         return saveAs(root, filePath);
     }
 
     public boolean saveAs(Bookmark root, String path) {
         boolean fileSaved = false;
+        boolean viewClosedForInPlaceSave = false;
+        File tempWorkCopy = null;
         try {
             //IBookmarksConverter bookmarksConverter = new iTextBookmarksConverter(filePath);
             IBookmarksConverter bookmarksConverter = Bookmark.getBookmarksConverter();
@@ -243,9 +280,30 @@ public final class UnifiedFileOperator {
                 throw new ServiceNotFoundException(Res.getString("ERROR_BOOKMARKS_CONVERTER_NOT_FOUND"));
             }
 
-            bookmarksConverter.open(filePath, userPassword);
+            boolean saveOverSameFile = Ut.samePhysicalFile(path, filePath);
+            if (saveOverSameFile) {
+                if (tmpForViewPanel == null) {
+                    closeViewForSaveOnEventThread();
+                    viewClosedForInPlaceSave = true;
+                }
+                Ut.waitUntilFileUnlockedForWrite(Paths.get(filePath), 100L, 10_000L);
+                File parent = new File(filePath).getAbsoluteFile().getParentFile();
+                if (parent != null && parent.isDirectory()) {
+                    tempWorkCopy = File.createTempFile("jpdf-work", ".pdf", parent);
+                } else {
+                    tempWorkCopy = File.createTempFile("jpdf-work", ".pdf");
+                }
+                tempWorkCopy.deleteOnExit();
+                Files.copy(Paths.get(filePath), tempWorkCopy.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            String pathForConverterOpen = saveOverSameFile ? tempWorkCopy.getAbsolutePath() : filePath;
+            bookmarksConverter.open(pathForConverterOpen, userPassword);
             bookmarksConverter.setShowBookmarksOnOpen(showOnOpen);
             bookmarksConverter.rebuildBookmarksFromTreeNodes(root);
+            if (saveOverSameFile) {
+                Ut.waitUntilFileUnlockedForWrite(Paths.get(path), 100L, 10_000L);
+            }
             bookmarksConverter.save(path, userPassword, ownerPassword);
             fileSaved = true;
             this.filePath = path;
@@ -255,6 +313,7 @@ public final class UnifiedFileOperator {
             } else {
                 viewPanel.reopen(file);
             }
+            viewClosedForInPlaceSave = false;
             fireFileOperationEvent(new FileOperationEvent(this, path,
                     FileOperationEvent.Operation.FILE_SAVED));
             setFileChanged(false);
@@ -262,9 +321,28 @@ public final class UnifiedFileOperator {
             bookmarksConverter = null;
             return fileSaved;
         } catch (Exception e) {
+            if (viewClosedForInPlaceSave) {
+                try {
+                    if (tmpForViewPanel != null) {
+                        viewPanel.reopen(tmpForViewPanel);
+                    } else if (file != null) {
+                        viewPanel.reopen(file);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
             JOptionPane.showMessageDialog(null, e.getMessage(), JPdfBookmarks.APP_NAME,
                     JOptionPane.ERROR_MESSAGE);
             return false;
+        } finally {
+            if (tempWorkCopy != null) {
+                try {
+                    if (!tempWorkCopy.delete()) {
+                        tempWorkCopy.deleteOnExit();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
@@ -289,11 +367,15 @@ public final class UnifiedFileOperator {
         setFileChanged(true);
     }
 
+    private void deliverFileOperationToListeners(FileOperationEvent e) {
+        for (FileOperationListener listener : fileOperationListeners) {
+            listener.fileOperation(e);
+        }
+    }
+
     private void fireFileOperationEvent(FileOperationEvent e) {
         if (SwingUtilities.isEventDispatchThread()) {
-            for (FileOperationListener listener : fileOperationListeners) {
-                listener.fileOperation(e);
-            }
+            deliverFileOperationToListeners(e);
         } else {
             SwingUtilities.invokeLater(new FireInEventThread(e));
         }
@@ -370,7 +452,7 @@ public final class UnifiedFileOperator {
 
         @Override
         public void run() {
-            fireFileOperationEvent(e);
+            deliverFileOperationToListeners(e);
         }
     }
 }

@@ -65,11 +65,19 @@ public class Prefs {
     private final String CONFIRM_WEB_ACCESS = "CONFIRM_WEB_ACCESS";
     private final String PANEL_TO_SHOW = "PANEL_TO_SHOW";
 
+    private final String AI_PROVIDER = "AI_PROVIDER";
+    private final String AI_OPENAI_API_KEY = "AI_OPENAI_API_KEY";
+    /** Chiave preferenza per il nome modello OpenAI; default effettivo {@code gpt-5.4-mini} in {@link #getOpenAiModel()}. */
+    public static final String AI_OPENAI_MODEL = "AI_OPENAI_MODEL";
+    private final String AI_OLLAMA_BASE_URL = "AI_OLLAMA_BASE_URL";
+    private final String AI_OLLAMA_MODEL = "AI_OLLAMA_MODEL";
+
     public static final String SHOW_FILE_TB = "SHOW_FILE_TB";
     public static final String SHOW_FITTYPE_TB = "SHOW_FITTYPE_TB";
     public static final String SHOW_ZOOM_TB = "SHOW_ZOOM_TB";
     public static final String SHOW_NAVIGATION_TB = "SHOW_NAVIGATION_TB";
     public static final String SHOW_OTHERS_TB = "SHOW_OTHERS_TB";
+    public static final String SHOW_AI_TB = "SHOW_AI_TB";
     public static final String SHOW_WEB_TB = "SHOW_WEB_TB";
 
     public static final String SHOW_ADD_TB = "SHOW_ADD_TB";
@@ -87,7 +95,7 @@ public class Prefs {
     /**
      * Empty constructor. It's a really simple class.
      */
-    Prefs() {
+    public Prefs() {
     }
 
     public String getPanelToShow() {
@@ -326,6 +334,55 @@ public class Prefs {
 
     void setNumClicks(int n) {
         userPrefs.putInt(NUM_CLICKS, n);
+    }
+
+    public String getAiProvider() {
+        return userPrefs.get(AI_PROVIDER, "OPENAI");
+    }
+
+    public void setAiProvider(String value) {
+        userPrefs.put(AI_PROVIDER, value != null ? value : "OPENAI");
+    }
+
+    public String getOpenAiApiKey() {
+        return userPrefs.get(AI_OPENAI_API_KEY, "");
+    }
+
+    public void setOpenAiApiKey(String value) {
+        userPrefs.put(AI_OPENAI_API_KEY, value != null ? value : "");
+    }
+
+    /**
+     * Nome modello OpenAI per le funzioni IA (es. estrazione indice). Preferenza {@code AI_OPENAI_MODEL};
+     * se assente o vuota si usa {@code gpt-5.4-mini}.
+     */
+    public String getOpenAiModel() {
+        String v = userPrefs.get(AI_OPENAI_MODEL, "gpt-5.4-mini");
+        if (v == null) {
+            return "gpt-5.4-mini";
+        }
+        v = v.trim();
+        return v.isEmpty() ? "gpt-5.4-mini" : v;
+    }
+
+    public void setOpenAiModel(String value) {
+        userPrefs.put(AI_OPENAI_MODEL, value != null ? value.trim() : "");
+    }
+
+    public String getOllamaBaseUrl() {
+        return userPrefs.get(AI_OLLAMA_BASE_URL, "http://localhost:11434");
+    }
+
+    public void setOllamaBaseUrl(String value) {
+        userPrefs.put(AI_OLLAMA_BASE_URL, value != null ? value : "http://localhost:11434");
+    }
+
+    public String getOllamaModel() {
+        return userPrefs.get(AI_OLLAMA_MODEL, "llama3-vision");
+    }
+
+    public void setOllamaModel(String value) {
+        userPrefs.put(AI_OLLAMA_MODEL, value != null ? value : "llama3-vision");
     }
 
 }

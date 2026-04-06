@@ -31,6 +31,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
@@ -339,5 +345,77 @@ public final class Ut {
         }
 
         return relativeFile;
+    }
+
+    /**
+     * Whether two path strings denote the same file (canonical path equality).
+     * Used e.g. for in-place save when an open viewer or PDF reader must release the file first.
+     */
+    public static boolean samePhysicalFile(String pathA, String pathB) {
+        if (pathA == null || pathB == null) {
+            return false;
+        }
+        try {
+            return new File(pathA).getCanonicalFile().equals(new File(pathB).getCanonicalFile());
+        } catch (IOException e) {
+            return new File(pathA).getAbsoluteFile().equals(new File(pathB).getAbsoluteFile());
+        }
+    }
+
+    /**
+     * Attende (con polling) che il file accetti un lock esclusivo {@link FileChannel#tryLock}.
+     * Su Windows una memory-mapped section può restare attiva anche quando il lock ha successo,
+     * quindi questo metodo è solo un aiuto — non garantisce da solo che la mappatura sia chiusa.
+     *
+     * @param pollIntervalMs intervallo tra un tentativo e il successivo (es. 100)
+     * @param maxWaitMs tempo massimo di attesa totale prima di fallire
+     */
+    public static void waitUntilFileUnlockedForWrite(Path path, long pollIntervalMs, long maxWaitMs)
+            throws IOException {
+        if (path == null) {
+            throw new IOException("Path is null");
+        }
+        if (!Files.exists(path)) {
+            return;
+        }
+        if (!Files.isRegularFile(path)) {
+            return;
+        }
+        if (!Files.isWritable(path)) {
+            throw new IOException("File is read-only: " + path);
+        }
+        long deadline = System.currentTimeMillis() + maxWaitMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new IOException("Interrupted while waiting for file unlock",
+                        new InterruptedException());
+            }
+            if (tryExclusiveWriteLockOnce(path)) {
+                return;
+            }
+            try {
+                Thread.sleep(pollIntervalMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while waiting for file unlock", e);
+            }
+        }
+        throw new IOException(
+                "Timeout after " + maxWaitMs + " ms: file still appears locked: " + path);
+    }
+
+    private static boolean tryExclusiveWriteLockOnce(Path path) {
+        try (FileChannel ch = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+            FileLock lock = ch.tryLock(0L, Long.MAX_VALUE, false);
+            if (lock != null) {
+                lock.release();
+                return true;
+            }
+        } catch (OverlappingFileLockException e) {
+            return false;
+        } catch (IOException e) {
+            return false;
+        }
+        return false;
     }
 }

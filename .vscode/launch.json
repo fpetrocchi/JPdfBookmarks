@@ -1,0 +1,175 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "VerticalText",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.labelvertical.VerticalText",
+            "projectName": "Utilities"
+        },
+        {
+            "type": "java",
+            "name": "LinkLabel",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.linklabel.LinkLabel",
+            "projectName": "Utilities"
+        },
+        {
+            "type": "java",
+            "name": "VerticalPanelSelector",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.panelselector.VerticalPanelSelector",
+            "projectName": "Utilities"
+        },
+        {
+            "type": "java",
+            "name": "GreekAlphabetFactory",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.factories.GreekAlphabetFactory",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "RomanAlphabetFactory",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.factories.RomanAlphabetFactory",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "RomanNumberFactory",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.factories.RomanNumberFactory",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "Pfm2afm",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.pdf.Pfm2afm",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "Base64",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.pdf.codec.Base64",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "CMapParser",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.pdf.fonts.cmaps.CMapParser",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "SimplePatternParser",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.pdf.hyphenation.SimplePatternParser",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "PdfContentReaderTool",
+            "request": "launch",
+            "mainClass": "com.lowagie.text.pdf.parser.PdfContentReaderTool",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "BuildTutorial",
+            "request": "launch",
+            "mainClass": "com.lowagie.tools.BuildTutorial",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "ConcatPdf",
+            "request": "launch",
+            "mainClass": "com.lowagie.tools.ConcatPdf",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "EncryptPdf",
+            "request": "launch",
+            "mainClass": "com.lowagie.tools.EncryptPdf",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "HandoutPdf",
+            "request": "launch",
+            "mainClass": "com.lowagie.tools.HandoutPdf",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "SplitPdf",
+            "request": "launch",
+            "mainClass": "com.lowagie.tools.SplitPdf",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "ToolboxAvailable",
+            "request": "launch",
+            "mainClass": "com.lowagie.tools.ToolboxAvailable",
+            "projectName": "iText-2.1.7-patched"
+        },
+        {
+            "type": "java",
+            "name": "AboutBox",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.jpdfbookmarks.AboutBox",
+            "projectName": "jpdfbookmarks_core"
+        },
+        {
+            "type": "java",
+            "name": "AuthenticatorDialog",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.jpdfbookmarks.AuthenticatorDialog",
+            "projectName": "jpdfbookmarks_core"
+        },
+        {
+            "type": "java",
+            "name": "JPdfBookmarks",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.jpdfbookmarks.JPdfBookmarks",
+            "projectName": "jpdfbookmarks_core",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "shortenCommandLine": "auto"
+        },
+        {
+            "type": "java",
+            "name": "JPdfBookmarks (Maven compile first)",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.jpdfbookmarks.JPdfBookmarks",
+            "projectName": "jpdfbookmarks_core",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "shortenCommandLine": "auto",
+            "preLaunchTask": "Maven: compile (reactor)"
+        },
+        {
+            "type": "java",
+            "name": "LicenseBox",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.jpdfbookmarks.LicenseBox",
+            "projectName": "jpdfbookmarks_core"
+        }
+    ]
+}

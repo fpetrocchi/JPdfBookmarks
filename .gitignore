@@ -13,4 +13,7 @@ buildNumber.properties
 
 # IDE (local workspace settings)
 .settings/
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json

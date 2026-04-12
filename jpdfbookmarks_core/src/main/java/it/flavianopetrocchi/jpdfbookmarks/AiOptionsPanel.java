@@ -13,6 +13,8 @@ import javax.swing.JPasswordField;
 import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.SupabaseAiClient;
+
 /**
  * Pannello opzioni IA: estrazione indice in locale (OpenAI; Ollama nel codice ma non in combo) oppure tramite cloud
  * (Supabase Edge o compatibile).
@@ -39,12 +41,6 @@ public class AiOptionsPanel extends JPanel {
     private final JTextField fieldCloudCheckUrl = new JTextField(32);
     private final JTextField fieldCloudFetchFullUrl = new JTextField(32);
     private final JTextField fieldCloudStripeMiniUrl = new JTextField(32);
-    private final JTextField fieldCloudStripeAdvancedUrl = new JTextField(32);
-    private final JComboBox<String> comboCloudProcessModel =
-            new JComboBox<>(
-                    new String[] {
-                        Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD, Prefs.CLOUD_PROCESS_INDEX_MODEL_ADVANCED
-                    });
 
     private final JPanel panelOpenAi;
     private final JPanel panelOllama;
@@ -205,6 +201,7 @@ public class AiOptionsPanel extends JPanel {
         c.weightx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
         p.add(fieldCloudAnonKey, c);
+        fieldCloudAnonKey.setToolTipText(Res.getString("AI_OPTIONS_CLOUD_ANON_KEY_HINT"));
 
         c.gridx = 0;
         c.gridy = 3;
@@ -235,26 +232,6 @@ public class AiOptionsPanel extends JPanel {
         c.weightx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
         p.add(fieldCloudStripeMiniUrl, c);
-
-        c.gridx = 0;
-        c.gridy = 6;
-        c.weightx = 0;
-        c.fill = GridBagConstraints.NONE;
-        p.add(new JLabel(Res.getString("AI_OPTIONS_CLOUD_STRIPE_ADVANCED_URL")), c);
-        c.gridx = 1;
-        c.weightx = 1;
-        c.fill = GridBagConstraints.HORIZONTAL;
-        p.add(fieldCloudStripeAdvancedUrl, c);
-
-        c.gridx = 0;
-        c.gridy = 7;
-        c.weightx = 0;
-        c.fill = GridBagConstraints.NONE;
-        p.add(new JLabel(Res.getString("AI_OPTIONS_CLOUD_PROCESS_MODEL")), c);
-        c.gridx = 1;
-        c.weightx = 1;
-        c.fill = GridBagConstraints.HORIZONTAL;
-        p.add(comboCloudProcessModel, c);
 
         return p;
     }
@@ -297,12 +274,10 @@ public class AiOptionsPanel extends JPanel {
         fieldOllamaUrl.setText(prefs.getOllamaBaseUrl());
         fieldOllamaModel.setText(prefs.getOllamaModel());
         fieldCloudProcessUrl.setText(prefs.getCloudProcessIndexUrl());
-        fieldCloudAnonKey.setText(prefs.getCloudSupabaseAnonKey());
+        fieldCloudAnonKey.setText(SupabaseAiClient.normalizeSupabasePublicAnonKey(prefs.getCloudSupabaseAnonKey()));
         fieldCloudCheckUrl.setText(prefs.getCloudCheckPaymentUrl());
         fieldCloudFetchFullUrl.setText(prefs.getCloudFetchFullResultsUrl());
         fieldCloudStripeMiniUrl.setText(prefs.getCloudStripeCheckoutMiniUrl());
-        fieldCloudStripeAdvancedUrl.setText(prefs.getCloudStripeCheckoutAdvancedUrl());
-        comboCloudProcessModel.setSelectedItem(prefs.getCloudProcessIndexModel());
         updateModeVisibility();
     }
 
@@ -322,12 +297,13 @@ public class AiOptionsPanel extends JPanel {
         prefs.setOllamaBaseUrl(fieldOllamaUrl.getText().trim());
         prefs.setOllamaModel(fieldOllamaModel.getText().trim());
         prefs.setCloudProcessIndexUrl(fieldCloudProcessUrl.getText().trim());
-        prefs.setCloudSupabaseAnonKey(new String(fieldCloudAnonKey.getPassword()));
+        prefs.setCloudSupabaseAnonKey(
+                SupabaseAiClient.normalizeSupabasePublicAnonKey(new String(fieldCloudAnonKey.getPassword())));
         prefs.setCloudCheckPaymentUrl(fieldCloudCheckUrl.getText().trim());
         prefs.setCloudFetchFullResultsUrl(fieldCloudFetchFullUrl.getText().trim());
         prefs.setCloudStripeCheckoutMiniUrl(fieldCloudStripeMiniUrl.getText().trim());
-        prefs.setCloudStripeCheckoutAdvancedUrl(fieldCloudStripeAdvancedUrl.getText().trim());
-        Object sel = comboCloudProcessModel.getSelectedItem();
-        prefs.setCloudProcessIndexModel(sel != null ? sel.toString() : Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD);
+        if (radioCloud.isSelected()) {
+            prefs.setCloudProcessIndexModel(Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD);
+        }
     }
 }

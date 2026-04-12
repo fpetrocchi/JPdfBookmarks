@@ -119,7 +119,17 @@ public class AiIndexBookmarksDialog extends JDialog {
         intro.setAlignmentX(JLabel.LEFT_ALIGNMENT);
         Font baseFont = intro.getFont();
         intro.setFont(baseFont.deriveFont(baseFont.getSize2D() + 0.5f));
-        content.add(intro, BorderLayout.NORTH);
+        JLabel destNote = new JLabel(htmlWrap(Res.getString("AI_INDEX_DESTINATION_NOTE"), 480));
+        destNote.setAlignmentX(JLabel.LEFT_ALIGNMENT);
+        destNote.setFont(baseFont.deriveFont(Math.max(11f, baseFont.getSize2D() - 0.5f)));
+        JPanel north = new JPanel();
+        north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.setOpaque(false);
+        north.setAlignmentX(Component.LEFT_ALIGNMENT);
+        north.add(intro);
+        north.add(Box.createVerticalStrut(10));
+        north.add(destNote);
+        content.add(north, BorderLayout.NORTH);
 
         int maxPage = Math.max(1, numPages);
 
@@ -433,7 +443,9 @@ public class AiIndexBookmarksDialog extends JDialog {
                                                 tid,
                                                 indexResult.getBookmarks(),
                                                 aiBookmarks ->
-                                                        handleCloudBookmarksReady(aiBookmarks, offset))
+                                                        handleCloudBookmarksReady(aiBookmarks, offset),
+                                                pdfView,
+                                                offset)
                                         .setVisible(true);
                                 return;
                             }

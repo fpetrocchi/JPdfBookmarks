@@ -102,9 +102,8 @@ public class PdfViewAdapter extends JScrollPane implements IPdfView {
     }
 
     public void open(File file) {
-        pageProducer = new DummyPageProducer();
-        DummyPageProducer pp = (DummyPageProducer) pageProducer;
-        pp.setIBookmarksConverter(converter);
+        pageProducer = IPageProducer.createDummy();
+        pageProducer.setIBookmarksConverter(converter);
     }
 
     public void reopen(File file) throws Exception {
@@ -507,10 +506,6 @@ public class PdfViewAdapter extends JScrollPane implements IPdfView {
     void setIBookmarksConverter(IBookmarksConverter bookmarksConverter) {
         this.converter = bookmarksConverter;
         numberOfPages = converter.getCountOfPages();
-//        if (pageProducer instanceof DummyPageProducer) {
-//            DummyPageProducer pp = (DummyPageProducer) pageProducer;
-//            pp.setIBookmarksConverter(converter);
-//        }
     }
 
     @Override

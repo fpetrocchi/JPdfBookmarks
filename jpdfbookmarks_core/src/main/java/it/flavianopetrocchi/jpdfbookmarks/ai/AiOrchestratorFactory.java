@@ -80,7 +80,8 @@ public final class AiOrchestratorFactory {
                             prefs.getCloudCheckPaymentUrl(),
                             prefs.getCloudFetchFullResultsUrl());
             PdfVisionService vision = new PdfVisionService(OPENAI_INDEX_RENDER_DPI);
-            return new AiOrchestrator(vision, null, false, cloud, prefs.getCloudProcessIndexModel());
+            return new AiOrchestrator(
+                    vision, null, false, cloud, Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD);
         }
         if (Prefs.AI_EXTRACTION_MODE_CLOUD.equals(prefs.getAiExtractionMode())) {
             throw new IllegalStateException(Res.getString("AI_ERROR_CLOUD_EXTRACTION_HINT"));

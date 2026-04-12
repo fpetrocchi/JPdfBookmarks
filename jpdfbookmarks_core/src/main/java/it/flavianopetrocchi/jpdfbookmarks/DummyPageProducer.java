@@ -44,6 +44,7 @@ public class DummyPageProducer implements IPageProducer {
         return new Page(pageNumber);
     }
 
+    @Override
     public void setIBookmarksConverter(IBookmarksConverter converter) {
         this.converter = converter;
         numberOfPages = converter.getCountOfPages();

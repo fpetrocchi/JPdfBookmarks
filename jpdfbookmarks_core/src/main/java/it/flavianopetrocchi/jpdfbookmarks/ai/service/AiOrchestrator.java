@@ -2,6 +2,7 @@ package it.flavianopetrocchi.jpdfbookmarks.ai.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.langchain4j.data.image.Image;
 import dev.langchain4j.data.message.ImageContent;
 import it.flavianopetrocchi.jpdfbookmarks.ai.agent.BookmarkExtractorAgent;
@@ -35,8 +36,12 @@ import org.apache.pdfbox.pdmodel.PDDocument;
  *       Logger dell'IDE.</li>
  * </ul>
  * <p>
- * <strong>Cartella {@code ai_debug}</strong> (sotto {@code user.dir}, di solito la root del progetto in IDE): con
- * {@code -Djpdfbookmarks.ai.debug=true} salva testo PDFBox e PNG inviati al modello per ogni esecuzione.
+ * <strong>Cartella {@code ai_debug}</strong> (sotto {@code user.dir}, di solito la root del progetto in IDE):
+ * <ul>
+ *   <li>Per ogni tentativo di estrazione vengono sempre scritti (salvo {@code -Djpdfbookmarks.ai.debug.persist=false})
+ *       {@code payload_request_*.json} e {@code ocr_debug_*.txt} tramite {@link AiExtractionDebugRecorder}.</li>
+ *   <li>Con {@code -Djpdfbookmarks.ai.debug=true} si aggiungono anche testo/PNG dettagliati come in passato.</li>
+ * </ul>
  */
 public class AiOrchestrator {
 
@@ -155,6 +160,12 @@ public class AiOrchestrator {
         String debugRunId =
                 DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(LocalDateTime.now());
         writeAiDebugArtifacts(indexPlainText, images, startPage, endPage, debugRunId);
+        boolean stackedVision = stackIndexPagesForVision && endPage > startPage;
+        AiExtractionDebugRecorder.tryWriteExtractionDebug(
+                debugRunId,
+                buildLocalExtractionDebugPayloadJson(
+                        startPage, endPage, indexPlainText, images.size(), stackedVision),
+                indexPlainText);
 
         List<ImageContent> pageContents = images.stream().map(ImageContent::from).toList();
         try {
@@ -255,8 +266,34 @@ public class AiOrchestrator {
         if (!"standard".equals(model) && !"advanced".equals(model)) {
             model = "standard";
         }
-        return ProcessIndexResult.fromCloudProcessIndex(
-                cloudClient.submitProcessIndex(startPage, endPage, indexPlainText, singlePng, model));
+        String cloudJson =
+                cloudClient.buildProcessIndexJsonPayload(
+                        startPage, endPage, indexPlainText, singlePng, model);
+        AiExtractionDebugRecorder.tryWriteExtractionDebug(debugRunId, cloudJson, indexPlainText);
+        return ProcessIndexResult.fromCloudProcessIndex(cloudClient.submitProcessIndexWithJson(cloudJson));
+    }
+
+    /**
+     * JSON descrittivo per {@code payload_request_*.json} in estrazione locale (nessuna Edge Function).
+     */
+    private static String buildLocalExtractionDebugPayloadJson(
+            int startPage,
+            int endPage,
+            String indexPlainText,
+            int renderedImageCount,
+            boolean stackedSingleImageForVision) {
+        try {
+            ObjectNode root = BOOKMARK_JSON.createObjectNode();
+            root.put("extractionMode", "local");
+            root.put("start_page", startPage);
+            root.put("end_page", endPage);
+            root.put("textLayerContent", indexPlainText != null ? indexPlainText : "");
+            root.put("renderedImageCount", renderedImageCount);
+            root.put("stackedSingleImageForVision", stackedSingleImageForVision);
+            return BOOKMARK_JSON.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+        } catch (Exception e) {
+            return "{\"extractionMode\":\"local\",\"debugPayloadError\":true}\n";
+        }
     }
 
     private static boolean isAiDebugEnabled() {

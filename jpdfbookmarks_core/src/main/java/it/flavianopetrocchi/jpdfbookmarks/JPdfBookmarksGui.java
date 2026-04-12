@@ -321,40 +321,51 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     private Action extractLinks;
     private Action copyBookmarkFromViewAction;// </editor-fold>
 
-//FIX BUG GUI Bookmarks display CJK char being noto problem
-//ADD FOR Change GUI Mode font and font size
-private  static  void  initGlobalFont(){
-String cjkProperties = "jpdfbookmarks.cjk.font.properties";
-String fName = "Noto Serif CJK TC";
-int fSize = 20;
-Properties props = new Properties();
-//try ( InputStream input = JPdfBookmarksGui.class.getClassLoader().getResourceAsStream("conf/"+cjkProperties)) {
-try ( InputStream input = JPdfBookmarksGui.class.getClassLoader().getResourceAsStream(cjkProperties)) {
-  if (input != null) {
-    props.load(input);
-    fName = props.getProperty("cjk.fontName");
-        fSize = Integer.parseInt(props.getProperty("cjk.fontSize"));
-FontUIResource fontUIResource = new FontUIResource(new Font( fName ,Font.PLAIN, fSize ));   
-
-for (Enumeration keys = UIManager.getDefaults().keys(); keys.hasMoreElements(); ) {
-    Object key = keys.nextElement();          
-    Object value= UIManager.get(key);          
-    if  (value instanceof FontUIResource) {              
-          UIManager.put(key, fontUIResource);          
-          }
+    /**
+     * Optional: load {@code jpdfbookmarks.cjk.font.properties} from the classpath and replace {@link FontUIResource}
+     * entries in {@link UIManager} defaults (CJK bookmark tree display).
+     */
+    private static void initGlobalFont() {
+        final String cjkProperties = "jpdfbookmarks.cjk.font.properties";
+        String fontName = "Noto Serif CJK TC";
+        int fontSize = 20;
+        Properties props = new Properties();
+        try (InputStream input =
+                JPdfBookmarksGui.class.getClassLoader().getResourceAsStream(cjkProperties)) {
+            if (input == null) {
+                Logger.getLogger(JPdfBookmarksGui.class.getName())
+                        .log(
+                                Level.WARNING,
+                                "Optional file {0} not on classpath; CJK font override skipped.",
+                                cjkProperties);
+                return;
+            }
+            props.load(input);
+            String pName = props.getProperty("cjk.fontName");
+            if (pName != null && !pName.isBlank()) {
+                fontName = pName.trim();
+            }
+            String pSize = props.getProperty("cjk.fontSize");
+            if (pSize != null && !pSize.isBlank()) {
+                fontSize = Integer.parseInt(pSize.trim());
+            }
+        } catch (IOException | NumberFormatException ex) {
+            Logger.getLogger(JPdfBookmarksGui.class.getName())
+                    .log(
+                            Level.WARNING,
+                            "Could not apply CJK font properties from " + cjkProperties + "; ignoring.",
+                            ex);
+            return;
+        }
+        FontUIResource fontUi = new FontUIResource(new Font(fontName, Font.PLAIN, fontSize));
+        for (Enumeration<Object> keys = UIManager.getDefaults().keys(); keys.hasMoreElements(); ) {
+            Object key = keys.nextElement();
+            Object value = UIManager.get(key);
+            if (value instanceof FontUIResource) {
+                UIManager.put(key, fontUi);
+            }
+        }
     }
-  } else {
-//Do NOTHING if jpdfbookmarks.cjk.font.properties does not existing.
-Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to load jpdfbookmarks.cjk.font.properties file ! You can ignore this warning message !");
-
-  }
-} catch (IOException ex) {
-//Do NOTHING if jpdfbookmarks.cjk.font.properties does not existing.
-Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to load jpdfbookmarks.cjk.font.properties file ! You can ignore this warning message !", ex);
-
-}
-
-}
 
     private void saveWindowState() {
         userPrefs.setWindowState(windowState);

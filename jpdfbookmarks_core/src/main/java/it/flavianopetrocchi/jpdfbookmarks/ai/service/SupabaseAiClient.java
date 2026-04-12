@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import it.flavianopetrocchi.jpdfbookmarks.Res;
 import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
 import java.io.IOException;
 import java.net.URI;
@@ -27,13 +28,14 @@ import java.util.Objects;
 public final class SupabaseAiClient {
 
     /**
-     * Risposta {@code GET check-payment}: {@code paid} e, se pagato, l'array {@code bookmarks} incluso nel JSON
+     * Risposta {@code GET check-payment}: {@code paid}, {@code model_type} quando noto, e segnalibri se inclusi
      * (contratto pdfbookmarks-backend).
      */
-    public record CheckPaymentResult(boolean paid, List<AiBookmark> bookmarksWhenPaid) {
+    public record CheckPaymentResult(boolean paid, List<AiBookmark> bookmarksWhenPaid, String modelTypeWhenPaid) {
         public CheckPaymentResult {
             bookmarksWhenPaid =
                     bookmarksWhenPaid != null ? List.copyOf(bookmarksWhenPaid) : List.of();
+            modelTypeWhenPaid = modelTypeWhenPaid != null ? modelTypeWhenPaid.trim() : "";
         }
     }
 
@@ -47,13 +49,32 @@ public final class SupabaseAiClient {
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(45)).build();
 
+    /**
+     * Normalizza la chiave anon copiata dal dashboard: rimuove {@code Bearer } se incollato per errore, virgolette e
+     * spazi/salti riga interni che invalidano il JWT (errore Supabase «Invalid Token or Protected Header formatting»).
+     */
+    public static String normalizeSupabasePublicAnonKey(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String t = raw.trim();
+        if (t.length() >= 2 && t.charAt(0) == '"' && t.charAt(t.length() - 1) == '"') {
+            t = t.substring(1, t.length() - 1).trim();
+        }
+        if (t.length() >= 7 && t.regionMatches(true, 0, "bearer ", 0, 7)) {
+            t = t.substring(7).trim();
+        }
+        t = t.replaceAll("\\s+", "");
+        return t;
+    }
+
     public SupabaseAiClient(
             String processIndexUrl,
             String anonKey,
             String checkPaymentUrl,
             String fetchBookmarksUrl) {
         this.processIndexUrl = Objects.requireNonNull(processIndexUrl, "processIndexUrl").trim();
-        this.anonKey = Objects.requireNonNull(anonKey, "anonKey").trim();
+        this.anonKey = normalizeSupabasePublicAnonKey(Objects.requireNonNull(anonKey, "anonKey"));
         this.checkPaymentUrl = checkPaymentUrl != null ? checkPaymentUrl.trim() : "";
         this.fetchBookmarksUrl = fetchBookmarksUrl != null ? fetchBookmarksUrl.trim() : "";
     }
@@ -61,18 +82,16 @@ public final class SupabaseAiClient {
     /**
      * Invia l'indice al backend Supabase. Il payload segue {@code process-index}: {@code imageBase64},
      * {@code textLayerContent} (testo layer come in {@code BookmarkExtractorAgent}), opzionale {@code model}
-     * ({@code standard} / {@code advanced}). I parametri {@code startPage}/{@code endPage} non sono letti dall'edge
+     * ({@code standard} / {@code advanced}), duplicato anche come {@code tier} per compatibilità con backend che
+     * leggono quel nome. I parametri {@code startPage}/{@code endPage} non sono letti dall'edge
      * attuale ma restano utili in log lato client.
      */
-    public CloudIndexResult submitProcessIndex(
+    /**
+     * Costruisce il corpo JSON inviato a {@code process-index} (stesso payload di {@link #submitProcessIndexWithJson}).
+     */
+    public String buildProcessIndexJsonPayload(
             int startPage, int endPage, String indexPlainText, byte[] indexPngBytes, String model)
             throws AiOrchestrationException {
-        if (processIndexUrl.isEmpty()) {
-            throw new AiOrchestrationException("Cloud process-index URL is empty.", null);
-        }
-        if (anonKey.isEmpty()) {
-            throw new AiOrchestrationException("Supabase anon key is empty.", null);
-        }
         if (indexPngBytes == null || indexPngBytes.length == 0) {
             throw new AiOrchestrationException("Index image bytes are empty; nothing to send to the cloud.", null);
         }
@@ -86,16 +105,39 @@ public final class SupabaseAiClient {
             String m = model.trim().toLowerCase(Locale.ROOT);
             if ("standard".equals(m) || "advanced".equals(m)) {
                 root.put("model", m);
+                root.put("tier", m);
             }
         }
-        String json;
         try {
-            json = MAPPER.writeValueAsString(root);
+            return MAPPER.writeValueAsString(root);
         } catch (Exception e) {
             throw new AiOrchestrationException("Failed to build cloud request JSON.", e);
         }
-        String body = httpPostJson(processIndexUrl, json);
+    }
+
+    /**
+     * Invia a {@code process-index} un JSON già serializzato (es. da {@link #buildProcessIndexJsonPayload}), evitando
+     * una seconda serializzazione.
+     */
+    public CloudIndexResult submitProcessIndexWithJson(String jsonBody) throws AiOrchestrationException {
+        if (processIndexUrl.isEmpty()) {
+            throw new AiOrchestrationException("Cloud process-index URL is empty.", null);
+        }
+        if (anonKey.isEmpty()) {
+            throw new AiOrchestrationException("Supabase anon key is empty.", null);
+        }
+        if (jsonBody == null || jsonBody.isBlank()) {
+            throw new AiOrchestrationException("Cloud request JSON is empty.", null);
+        }
+        String body = httpPostJson(processIndexUrl, jsonBody);
         return parseProcessIndexResponse(body);
+    }
+
+    public CloudIndexResult submitProcessIndex(
+            int startPage, int endPage, String indexPlainText, byte[] indexPngBytes, String model)
+            throws AiOrchestrationException {
+        return submitProcessIndexWithJson(
+                buildProcessIndexJsonPayload(startPage, endPage, indexPlainText, indexPngBytes, model));
     }
 
     /**
@@ -110,9 +152,10 @@ public final class SupabaseAiClient {
         String body = httpGet(url);
         JsonNode node = readTree(body);
         if (node == null || node.isNull()) {
-            return new CheckPaymentResult(false, List.of());
+            return new CheckPaymentResult(false, List.of(), "");
         }
         boolean paid = paidFlagFromCheckPaymentJson(node);
+        String modelType = readPaidModelType(node);
         List<AiBookmark> bookmarks = List.of();
         if (paid) {
             List<AiBookmark> parsed = parseBookmarkArray(node);
@@ -120,7 +163,7 @@ public final class SupabaseAiClient {
                 bookmarks = parsed;
             }
         }
-        return new CheckPaymentResult(paid, bookmarks);
+        return new CheckPaymentResult(paid, bookmarks, paid ? modelType : "");
     }
 
     /**
@@ -128,6 +171,19 @@ public final class SupabaseAiClient {
      */
     public boolean checkPaymentStatus(String taskId) throws AiOrchestrationException {
         return checkPayment(taskId).paid();
+    }
+
+    /** {@code model_type} / {@code modelType} / {@code tier} dalla risposta check-payment (solo quando {@code paid}). */
+    private static String readPaidModelType(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return "";
+        }
+        String t = firstText(node, "model_type", "modelType", "tier");
+        if (t == null || t.isBlank()) {
+            return "";
+        }
+        t = t.trim().toLowerCase(Locale.ROOT);
+        return "advanced".equals(t) ? "advanced" : "standard";
     }
 
     private static boolean paidFlagFromCheckPaymentJson(JsonNode node) {
@@ -308,8 +364,7 @@ public final class SupabaseAiClient {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int code = resp.statusCode();
             if (code < 200 || code >= 300) {
-                throw new AiOrchestrationException(
-                        "Cloud request failed (HTTP " + code + "): " + abbreviate(resp.body()), null);
+                throw cloudHttpError(code, resp.body());
             }
             return resp.body();
         } catch (AiOrchestrationException e) {
@@ -331,8 +386,7 @@ public final class SupabaseAiClient {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int code = resp.statusCode();
             if (code < 200 || code >= 300) {
-                throw new AiOrchestrationException(
-                        "Cloud request failed (HTTP " + code + "): " + abbreviate(resp.body()), null);
+                throw cloudHttpError(code, resp.body());
             }
             return resp.body();
         } catch (AiOrchestrationException e) {
@@ -340,6 +394,19 @@ public final class SupabaseAiClient {
         } catch (Exception e) {
             throw new AiOrchestrationException("Network error calling cloud service: " + e.getMessage(), e);
         }
+    }
+
+    private static AiOrchestrationException cloudHttpError(int code, String body) {
+        String snippet = abbreviate(body);
+        if (code == 401) {
+            return new AiOrchestrationException(
+                    "Cloud request failed (HTTP 401): "
+                            + snippet
+                            + "\n\n"
+                            + Res.getString("AI_CLOUD_HTTP_401_HINT"),
+                    null);
+        }
+        return new AiOrchestrationException("Cloud request failed (HTTP " + code + "): " + snippet, null);
     }
 
     private static String appendQueryTaskId(String baseUrl, String taskId) throws AiOrchestrationException {

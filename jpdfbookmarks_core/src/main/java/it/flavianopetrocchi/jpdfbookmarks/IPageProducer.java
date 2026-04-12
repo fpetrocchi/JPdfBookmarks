@@ -22,6 +22,8 @@
 
 package it.flavianopetrocchi.jpdfbookmarks;
 
+import it.flavianopetrocchi.jpdfbookmarks.bookmark.IBookmarksConverter;
+
 /**
  * An interface to a PDF reader class. This class is apparently never used.
  * 
@@ -35,4 +37,18 @@ public interface IPageProducer {
      * @return a rendered page.
      */
     public IPage getPage(int pageNumber);
+
+    /**
+     * Supplies bookmark metadata to producers that render placeholder pages from outline data.
+     * Default implementation does nothing.
+     */
+    default void setIBookmarksConverter(IBookmarksConverter converter) {
+    }
+
+    /**
+     * Producer used when no PDF renderer is wired (outline-only / adapter mode).
+     */
+    static IPageProducer createDummy() {
+        return new DummyPageProducer();
+    }
 }

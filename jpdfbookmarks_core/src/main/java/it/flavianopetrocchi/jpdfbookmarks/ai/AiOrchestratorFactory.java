@@ -5,9 +5,11 @@ import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.service.AiServices;
 import it.flavianopetrocchi.jpdfbookmarks.Prefs;
+import it.flavianopetrocchi.jpdfbookmarks.Res;
 import it.flavianopetrocchi.jpdfbookmarks.ai.agent.BookmarkExtractorAgent;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.PdfVisionService;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.SupabaseAiClient;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
@@ -23,6 +25,9 @@ import java.util.Objects;
  * Provider {@code OLLAMA}: {@link Prefs#getOllamaBaseUrl()} e {@link Prefs#getOllamaModel()}.
  * Le pagine dell'indice vengono unite in un'unica immagine verticale perché modelli come {@code llama3.2-vision}
  * accettano una sola immagine per richiesta. Timeout HTTP lungo e DPI di rendering più basso (180) rispetto a OpenAI.
+ * <p>
+ * Modalità cloud: se {@link Prefs#isCloudIndexExtraction()} è {@code true}, si usa {@link SupabaseAiClient} con
+ * {@link Prefs#getCloudProcessIndexUrl()} e {@link Prefs#getCloudSupabaseAnonKey()} (nessun modello locale).
  */
 public final class AiOrchestratorFactory {
 
@@ -67,6 +72,19 @@ public final class AiOrchestratorFactory {
      */
     public static AiOrchestrator createOrchestrator(Prefs prefs) {
         Objects.requireNonNull(prefs, "prefs");
+        if (prefs.isCloudIndexExtraction()) {
+            SupabaseAiClient cloud =
+                    new SupabaseAiClient(
+                            prefs.getCloudProcessIndexUrl().trim(),
+                            prefs.getCloudSupabaseAnonKey().trim(),
+                            prefs.getCloudCheckPaymentUrl(),
+                            prefs.getCloudFetchFullResultsUrl());
+            PdfVisionService vision = new PdfVisionService(OPENAI_INDEX_RENDER_DPI);
+            return new AiOrchestrator(vision, null, false, cloud, prefs.getCloudProcessIndexModel());
+        }
+        if (Prefs.AI_EXTRACTION_MODE_CLOUD.equals(prefs.getAiExtractionMode())) {
+            throw new IllegalStateException(Res.getString("AI_ERROR_CLOUD_EXTRACTION_HINT"));
+        }
         ChatModel chatModel = buildChatModel(prefs);
         BookmarkExtractorAgent agent =
                 AiServices.builder(BookmarkExtractorAgent.class).chatModel(chatModel).build();

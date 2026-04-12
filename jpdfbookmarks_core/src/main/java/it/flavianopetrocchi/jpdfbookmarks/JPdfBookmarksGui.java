@@ -68,7 +68,6 @@ import java.awt.dnd.DropTargetListener;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
-import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -258,6 +257,8 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     private final ToolbarsPopupListener toolbarsPopupListener = new ToolbarsPopupListener();
     /** Ultimi valori del dialogo IA indice; azzerato a ogni apertura di un nuovo file. */
     private AiIndexBookmarksDialog.AiIndexDialogMemory aiIndexDialogMemory;
+    /** Dialogo indice IA eventualmente aperto; chiuso alla chiusura del PDF. */
+    private AiIndexBookmarksDialog openAiIndexBookmarksDialog;
     private LeftPanel leftPanel;
     private ButtonGroup leftPanelMenuGroup;// </editor-fold>
     // <editor-fold defaultstate="collapsed" desc="Actions">
@@ -367,7 +368,7 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         //userPrefs.setSplitterLocation(centralSplit.getDividerLocation());
         userPrefs.setCollapsingPanelState(leftPanel.getPanelState());
         userPrefs.setSplitterLocation(leftPanel.getDividerLocation());
-        userPrefs.setPanelToShow((String) leftPanel.getComboBoxSelector().getSelectedItem());
+        userPrefs.setPanelToShow(leftPanel.getSelectedInnerPanelName());
     }
 
     private void loadWindowState() {
@@ -555,6 +556,7 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
                 setTitle(getTitle() + " - " + Res.getString("READONLY"));
             }
         } else if (evt.getOperation() == FileOperationEvent.Operation.FILE_CLOSED) {
+            disposeOpenAiIndexBookmarksDialog();
             setTitle(title);
             txtGoToPage.setText("0");
             lblPageOfPages.setText(" / 0 ");
@@ -1795,6 +1797,15 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         recreateNodesOpenedState();
     }
 
+    private void disposeOpenAiIndexBookmarksDialog() {
+        if (openAiIndexBookmarksDialog != null) {
+            if (openAiIndexBookmarksDialog.isDisplayable()) {
+                openAiIndexBookmarksDialog.dispose();
+            }
+            openAiIndexBookmarksDialog = null;
+        }
+    }
+
     private void generateBookmarksFromIndexAiDialog() {
         if (viewPanel == null || viewPanel.getPdDocument() == null) {
             JOptionPane.showMessageDialog(
@@ -1806,6 +1817,7 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         }
         try {
             AiOrchestrator orchestrator = AiOrchestratorFactory.createOrchestrator(userPrefs);
+            disposeOpenAiIndexBookmarksDialog();
             AiIndexBookmarksDialog dlg =
                     new AiIndexBookmarksDialog(
                             this,
@@ -1813,8 +1825,20 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
                             viewPanel.getNumPages(),
                             orchestrator,
                             this::applyAiExtractedBookmarksFromIndex,
+                            userPrefs,
+                            viewPanel,
                             aiIndexDialogMemory,
                             state -> aiIndexDialogMemory = state);
+            openAiIndexBookmarksDialog = dlg;
+            dlg.addWindowListener(
+                    new WindowAdapter() {
+                        @Override
+                        public void windowClosed(WindowEvent e) {
+                            if (openAiIndexBookmarksDialog == dlg) {
+                                openAiIndexBookmarksDialog = null;
+                            }
+                        }
+                    });
             dlg.setVisible(true);
         } catch (IllegalStateException ex) {
             JOptionPane.showMessageDialog(
@@ -3432,21 +3456,21 @@ Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.WARNING,"Failed to 
         leftPanel = new LeftPanel(centralSplit);
         leftPanel.addBookmarksPanel(createBookmarksPanel());
         leftPanel.addThumbnailsPanel(createThumbnailsPanel());
-        leftPanel.getComboBoxSelector().addItemListener((ItemEvent e) -> {
-            if (e.getStateChange() != ItemEvent.SELECTED) {
-                return;
-            }
-            String item = (String) e.getItem();
-            if (item.equals(Res.getString("BOOKMARKS_TAB_TITLE"))) {
-                bookmarksButton.setSelected(true);
-            } else {
-                thumbnailsButton.setSelected(true);
-                if (item.equals(Res.getString("THUMBNAILS_TAB_TITLE"))) {
-                    scrollThumbnailsToCurrentPage();
-                }
-            }
-        });
-        leftPanel.getComboBoxSelector().setSelectedItem(userPrefs.getPanelToShow());
+        leftPanel.addPanelSelectionListener(
+                panelName -> {
+                    if (panelName == null) {
+                        return;
+                    }
+                    if (panelName.equals(Res.getString("BOOKMARKS_TAB_TITLE"))) {
+                        bookmarksButton.setSelected(true);
+                    } else {
+                        thumbnailsButton.setSelected(true);
+                        if (panelName.equals(Res.getString("THUMBNAILS_TAB_TITLE"))) {
+                            scrollThumbnailsToCurrentPage();
+                        }
+                    }
+                });
+        leftPanel.setSelectedInnerPanelName(userPrefs.getPanelToShow());
 //        leftPanel.addInnerPanel(createBookmarksPanel(), Res.getString("BOOKMARKS_TAB_TITLE"));
 //        leftPanel.addInnerPanel(createThumbnailsPanel(), Res.getString("THUMBNAILS_TAB_TITLE"));
 

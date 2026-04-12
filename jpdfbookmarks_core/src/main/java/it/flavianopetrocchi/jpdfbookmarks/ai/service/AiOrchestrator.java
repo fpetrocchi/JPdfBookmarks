@@ -13,8 +13,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -58,18 +60,57 @@ public class AiOrchestrator {
     private final BookmarkExtractorAgent extractorAgent;
     /** Se true, le pagine indice vengono unite in un'unica immagine (es. Ollama llama3.2-vision: una sola immagine per richiesta). */
     private final boolean stackIndexPagesForVision;
+    private final SupabaseAiClient cloudClient;
+    /** Invito a {@code process-index} ({@code standard} / {@code advanced}); usato solo se {@link #cloudClient} non è null. */
+    private final String cloudProcessIndexModel;
 
     public AiOrchestrator(PdfVisionService visionService, BookmarkExtractorAgent extractorAgent) {
-        this(visionService, extractorAgent, false);
+        this(visionService, extractorAgent, false, null, null);
     }
 
     public AiOrchestrator(
             PdfVisionService visionService,
             BookmarkExtractorAgent extractorAgent,
             boolean stackIndexPagesForVision) {
+        this(visionService, extractorAgent, stackIndexPagesForVision, null, null);
+    }
+
+    /**
+     * @param cloudClient se non {@code null}, {@link #processIndex} invia testo e immagini al servizio cloud invece
+     *                    del modello locale; {@code extractorAgent} può essere {@code null}.
+     */
+    public AiOrchestrator(
+            PdfVisionService visionService,
+            BookmarkExtractorAgent extractorAgent,
+            boolean stackIndexPagesForVision,
+            SupabaseAiClient cloudClient) {
+        this(visionService, extractorAgent, stackIndexPagesForVision, cloudClient, null);
+    }
+
+    /**
+     * Come {@link #AiOrchestrator(PdfVisionService, BookmarkExtractorAgent, boolean, SupabaseAiClient)} con
+     * {@code model} passato a {@link SupabaseAiClient#submitProcessIndex(int, int, String, byte[], String)}.
+     */
+    public AiOrchestrator(
+            PdfVisionService visionService,
+            BookmarkExtractorAgent extractorAgent,
+            boolean stackIndexPagesForVision,
+            SupabaseAiClient cloudClient,
+            String cloudProcessIndexModel) {
         this.visionService = Objects.requireNonNull(visionService, "visionService");
-        this.extractorAgent = Objects.requireNonNull(extractorAgent, "extractorAgent");
         this.stackIndexPagesForVision = stackIndexPagesForVision;
+        this.cloudClient = cloudClient;
+        this.cloudProcessIndexModel = cloudProcessIndexModel;
+        if (cloudClient == null) {
+            this.extractorAgent = Objects.requireNonNull(extractorAgent, "extractorAgent");
+        } else {
+            this.extractorAgent = extractorAgent;
+        }
+    }
+
+    /** @return {@code true} se l'estrazione indice passa da {@link SupabaseAiClient}. */
+    public boolean usesCloudService() {
+        return cloudClient != null;
     }
 
     /**
@@ -78,12 +119,16 @@ public class AiOrchestrator {
      * @param document   PDF aperto (non viene chiuso)
      * @param startPage  prima pagina dell'indice, 1-based inclusiva
      * @param endPage    ultima pagina dell'indice, 1-based inclusiva
-     * @return alberi di segnalibri alla radice (lista di nodi top-level), con numeri di pagina come restituiti dal modello
+     * @return segnalibri e/o metadati task cloud ({@link ProcessIndexResult})
      * @throws AiOrchestrationException in caso di errore di rendering o di fallimento dell'IA
      */
-    public List<AiBookmark> processIndex(PDDocument document, int startPage, int endPage)
+    public ProcessIndexResult processIndex(PDDocument document, int startPage, int endPage)
             throws AiOrchestrationException {
         Objects.requireNonNull(document, "document");
+        if (cloudClient != null) {
+            return processIndexViaCloud(document, startPage, endPage);
+        }
+        Objects.requireNonNull(extractorAgent, "extractorAgent");
 
         String indexPlainText = extractIndexPlainTextForAi(document, startPage, endPage);
 
@@ -115,7 +160,7 @@ public class AiOrchestrator {
         try {
             String raw = extractorAgent.extractBookmarks(indexPlainText, pageContents);
             logRawModelResponseForDebug(raw);
-            return parseBookmarksJson(raw);
+            return ProcessIndexResult.localBookmarks(parseBookmarksJson(raw));
         } catch (AiOrchestrationException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -129,7 +174,7 @@ public class AiOrchestrator {
                             extractorAgent.extractBookmarks(
                                     indexPlainText, List.of(ImageContent.from(stacked)));
                     logRawModelResponseForDebug(raw);
-                    return parseBookmarksJson(raw);
+                    return ProcessIndexResult.localBookmarks(parseBookmarksJson(raw));
                 } catch (AiOrchestrationException ex2) {
                     throw ex2;
                 } catch (Exception ex2) {
@@ -153,6 +198,65 @@ public class AiOrchestrator {
                             + "e riprova.",
                     ex);
         }
+    }
+
+    private ProcessIndexResult processIndexViaCloud(PDDocument document, int startPage, int endPage)
+            throws AiOrchestrationException {
+        String indexPlainText = extractIndexPlainTextForAi(document, startPage, endPage);
+        List<Image> images;
+        try {
+            if (stackIndexPagesForVision && endPage > startPage) {
+                images =
+                        List.of(
+                                visionService.renderIndexPagesAsSingleStackedLangChainImage(
+                                        document, startPage, endPage));
+            } else {
+                images = visionService.renderPagesAsLangChainImages(document, startPage, endPage);
+            }
+        } catch (IllegalArgumentException ex) {
+            throw new AiOrchestrationException(
+                    "Intervallo di pagine non valido per l'indice: " + ex.getMessage(), ex);
+        } catch (IOException ex) {
+            throw new AiOrchestrationException(
+                    "Non è stato possibile convertire le pagine dell'indice in immagini per il servizio cloud. "
+                            + "Verifica che il PDF non sia danneggiato o protetto in modo incompatibile e riprova.",
+                    ex);
+        }
+        String debugRunId =
+                DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(LocalDateTime.now());
+        writeAiDebugArtifacts(indexPlainText, images, startPage, endPage, debugRunId);
+        List<byte[]> pngs = new ArrayList<>();
+        for (Image img : images) {
+            try {
+                pngs.add(langChainImageToPngBytes(img));
+            } catch (IOException e) {
+                throw new AiOrchestrationException("Impossibile codificare le immagini indice per il cloud.", e);
+            }
+        }
+        final byte[] singlePng;
+        try {
+            if (pngs.size() == 1) {
+                singlePng = pngs.get(0);
+            } else {
+                Image stacked =
+                        visionService.renderIndexPagesAsSingleStackedLangChainImage(
+                                document, startPage, endPage);
+                writeAiDebugStackedImage(stacked, startPage, endPage, debugRunId);
+                singlePng = langChainImageToPngBytes(stacked);
+            }
+        } catch (IOException e) {
+            throw new AiOrchestrationException(
+                    "Impossibile unire le pagine indice in un'unica immagine per il servizio cloud.", e);
+        }
+        String model =
+                cloudProcessIndexModel != null && !cloudProcessIndexModel.isBlank()
+                        ? cloudProcessIndexModel.trim().toLowerCase(Locale.ROOT)
+                        : "standard";
+        if (!"standard".equals(model) && !"advanced".equals(model)) {
+            model = "standard";
+        }
+        return ProcessIndexResult.fromCloudProcessIndex(
+                cloudClient.submitProcessIndex(startPage, endPage, indexPlainText, singlePng, model));
     }
 
     private static boolean isAiDebugEnabled() {

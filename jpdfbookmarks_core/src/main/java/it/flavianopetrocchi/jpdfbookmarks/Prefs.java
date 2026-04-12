@@ -72,6 +72,27 @@ public class Prefs {
     private final String AI_OLLAMA_BASE_URL = "AI_OLLAMA_BASE_URL";
     private final String AI_OLLAMA_MODEL = "AI_OLLAMA_MODEL";
 
+    private final String AI_EXTRACTION_MODE = "AI_EXTRACTION_MODE";
+    private final String AI_CLOUD_PROCESS_INDEX_URL = "AI_CLOUD_PROCESS_INDEX_URL";
+    private final String AI_CLOUD_ANON_KEY = "AI_CLOUD_ANON_KEY";
+    private final String AI_CLOUD_CHECK_PAYMENT_URL = "AI_CLOUD_CHECK_PAYMENT_URL";
+    private final String AI_CLOUD_FETCH_BOOKMARKS_URL = "AI_CLOUD_FETCH_BOOKMARKS_URL";
+    private final String AI_CLOUD_FETCH_FULL_RESULTS_URL = "AI_CLOUD_FETCH_FULL_RESULTS_URL";
+    private final String AI_CLOUD_STRIPE_CHECKOUT_MINI_URL = "AI_CLOUD_STRIPE_CHECKOUT_MINI_URL";
+    private final String AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL = "AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL";
+    private final String AI_CLOUD_PROCESS_INDEX_MODEL = "AI_CLOUD_PROCESS_INDEX_MODEL";
+
+    /** Valore {@code model} inviato a process-index (tier estrazione). */
+    public static final String CLOUD_PROCESS_INDEX_MODEL_STANDARD = "standard";
+
+    public static final String CLOUD_PROCESS_INDEX_MODEL_ADVANCED = "advanced";
+
+    /** Estrazione indice tramite OpenAI/Ollama in locale. */
+    public static final String AI_EXTRACTION_MODE_LOCAL = "LOCAL";
+
+    /** Estrazione indice tramite Edge Function (es. Supabase) con immagini inviate al cloud. */
+    public static final String AI_EXTRACTION_MODE_CLOUD = "CLOUD";
+
     public static final String SHOW_FILE_TB = "SHOW_FILE_TB";
     public static final String SHOW_FITTYPE_TB = "SHOW_FITTYPE_TB";
     public static final String SHOW_ZOOM_TB = "SHOW_ZOOM_TB";
@@ -383,6 +404,128 @@ public class Prefs {
 
     public void setOllamaModel(String value) {
         userPrefs.put(AI_OLLAMA_MODEL, value != null ? value : "llama3-vision");
+    }
+
+    /**
+     * {@value #AI_EXTRACTION_MODE_LOCAL} oppure {@value #AI_EXTRACTION_MODE_CLOUD}; default locale.
+     */
+    public String getAiExtractionMode() {
+        String v = userPrefs.get(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL);
+        if (v == null || v.isBlank()) {
+            return AI_EXTRACTION_MODE_LOCAL;
+        }
+        return v.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    public void setAiExtractionMode(String value) {
+        if (value == null || value.isBlank()) {
+            userPrefs.put(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL);
+            return;
+        }
+        String u = value.trim().toUpperCase(java.util.Locale.ROOT);
+        if (AI_EXTRACTION_MODE_CLOUD.equals(u)) {
+            userPrefs.put(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_CLOUD);
+        } else {
+            userPrefs.put(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL);
+        }
+    }
+
+    /** True se l'utente ha scelto il cloud e URL/anon key non sono vuoti. */
+    public boolean isCloudIndexExtraction() {
+        return AI_EXTRACTION_MODE_CLOUD.equals(getAiExtractionMode())
+                && !getCloudProcessIndexUrl().trim().isEmpty()
+                && !getCloudSupabaseAnonKey().trim().isEmpty();
+    }
+
+    public String getCloudProcessIndexUrl() {
+        return userPrefs.get(AI_CLOUD_PROCESS_INDEX_URL, "");
+    }
+
+    public void setCloudProcessIndexUrl(String value) {
+        userPrefs.put(AI_CLOUD_PROCESS_INDEX_URL, value != null ? value : "");
+    }
+
+    public String getCloudSupabaseAnonKey() {
+        return userPrefs.get(AI_CLOUD_ANON_KEY, "");
+    }
+
+    public void setCloudSupabaseAnonKey(String value) {
+        userPrefs.put(AI_CLOUD_ANON_KEY, value != null ? value : "");
+    }
+
+    public String getCloudCheckPaymentUrl() {
+        return userPrefs.get(AI_CLOUD_CHECK_PAYMENT_URL, "");
+    }
+
+    public void setCloudCheckPaymentUrl(String value) {
+        userPrefs.put(AI_CLOUD_CHECK_PAYMENT_URL, value != null ? value : "");
+    }
+
+    public String getCloudFetchBookmarksUrl() {
+        return userPrefs.get(AI_CLOUD_FETCH_BOOKMARKS_URL, "");
+    }
+
+    public void setCloudFetchBookmarksUrl(String value) {
+        userPrefs.put(AI_CLOUD_FETCH_BOOKMARKS_URL, value != null ? value : "");
+    }
+
+    /** URL GET per scaricare i segnalibri dopo pagamento; se vuota si usa la vecchia chiave {@link #AI_CLOUD_FETCH_BOOKMARKS_URL}. */
+    public String getCloudFetchFullResultsUrl() {
+        String v = userPrefs.get(AI_CLOUD_FETCH_FULL_RESULTS_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        String legacy = userPrefs.get(AI_CLOUD_FETCH_BOOKMARKS_URL, "");
+        return legacy != null ? legacy.trim() : "";
+    }
+
+    public void setCloudFetchFullResultsUrl(String value) {
+        userPrefs.put(AI_CLOUD_FETCH_FULL_RESULTS_URL, value != null ? value.trim() : "");
+    }
+
+    public String getCloudStripeCheckoutMiniUrl() {
+        return userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, "");
+    }
+
+    public void setCloudStripeCheckoutMiniUrl(String value) {
+        userPrefs.put(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, value != null ? value.trim() : "");
+    }
+
+    public String getCloudStripeCheckoutAdvancedUrl() {
+        return userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, "");
+    }
+
+    public void setCloudStripeCheckoutAdvancedUrl(String value) {
+        userPrefs.put(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, value != null ? value.trim() : "");
+    }
+
+    /**
+     * Modello opzionale per {@code process-index}: {@value #CLOUD_PROCESS_INDEX_MODEL_STANDARD} o
+     * {@value #CLOUD_PROCESS_INDEX_MODEL_ADVANCED}.
+     */
+    public String getCloudProcessIndexModel() {
+        String v = userPrefs.get(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
+        if (v == null || v.isBlank()) {
+            return CLOUD_PROCESS_INDEX_MODEL_STANDARD;
+        }
+        v = v.trim().toLowerCase(java.util.Locale.ROOT);
+        if (CLOUD_PROCESS_INDEX_MODEL_ADVANCED.equals(v)) {
+            return CLOUD_PROCESS_INDEX_MODEL_ADVANCED;
+        }
+        return CLOUD_PROCESS_INDEX_MODEL_STANDARD;
+    }
+
+    public void setCloudProcessIndexModel(String value) {
+        if (value == null || value.isBlank()) {
+            userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
+            return;
+        }
+        String u = value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (CLOUD_PROCESS_INDEX_MODEL_ADVANCED.equals(u)) {
+            userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_ADVANCED);
+        } else {
+            userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
+        }
     }
 
 }

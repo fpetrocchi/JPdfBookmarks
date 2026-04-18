@@ -640,6 +640,11 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         } else {
             Ut.enableActions(false, goNextPageAction, goLastPageAction);
         }
+
+        String thumbsTab = Res.getString("THUMBNAILS_TAB_TITLE");
+        if (thumbsTab.equals(leftPanel.getSelectedInnerPanelName())) {
+            SwingUtilities.invokeLater(this::scrollThumbnailsToCurrentPage);
+        }
     }
 
     private void enableInheritChecks(boolean top, boolean left, boolean zoom) {
@@ -1023,7 +1028,9 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         }
         int p = txtGoToPage.getInteger();
         if (p >= 1) {
-            ((ThumbnailsPane) tsp).scrollPageThumbIntoView(p);
+            ThumbnailsPane tp = (ThumbnailsPane) tsp;
+            SwingUtilities.invokeLater(() ->
+                    SwingUtilities.invokeLater(() -> tp.scrollPageThumbIntoView(p)));
         }
     }
 
@@ -3508,7 +3515,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
                     } else {
                         thumbnailsButton.setSelected(true);
                         if (panelName.equals(Res.getString("THUMBNAILS_TAB_TITLE"))) {
-                            scrollThumbnailsToCurrentPage();
+                            SwingUtilities.invokeLater(this::scrollThumbnailsToCurrentPage);
                         }
                     }
                 });

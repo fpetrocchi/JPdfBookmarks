@@ -231,6 +231,10 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
             goToPageIndex(p);
         } else {
             pendingRestorePageIndex = -1;
+            if (numberOfPages > 0) {
+                int syncPage = pageIndex >= 0 ? pageIndex + 1 : 1;
+                thumbnails.scrollPageThumbIntoView(syncPage);
+            }
         }
         savePresentationSnapshot = null;
         scrollBeforeSaveSnapshot = null;

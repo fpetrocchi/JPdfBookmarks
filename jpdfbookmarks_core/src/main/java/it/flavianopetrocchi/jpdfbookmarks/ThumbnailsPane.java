@@ -25,6 +25,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.border.Border;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -84,6 +85,9 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
     private static final float THUMB_RENDER_SUPERSAMPLE = 2f;
     private static final Color THUMB_VIEWPORT_BG = new Color(0xf0f0f0);
     private static final Color THUMB_CARD_BORDER = new Color(0xc8c8c8);
+    /** Same accent as {@code CollapsingPanel} tab selection — clearly marks the page open in the viewer. */
+    private static final Color THUMB_CURRENT_PAGE_BORDER = new Color(230, 130, 40);
+    private static final int THUMB_CURRENT_PAGE_LINE = 2;
 
     /** The PDFBox PDF document. */
     private PDDocument document;
@@ -99,6 +103,9 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
     private ChangeListener thumbnailViewportListener;
     /** While true, viewport-driven generation is skipped (e.g. document closed mid-save). */
     private volatile boolean thumbnailGenSuspended;
+
+    /** 1-based page matching the main viewer; {@code -1} if none applied yet. */
+    private int highlightedPageOneBased = -1;
 
     /** Current edge length (px) of the square thumbnail image; follows sidebar width. */
     private int thumbRenderPixels = THUMB_PIXEL_MIN;
@@ -169,13 +176,51 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
     }
 
     private void applyButtonThumbSize(ThumbnailButton tb) {
-        int line = THUMB_CARD_LINE;
+        int line = Math.max(THUMB_CARD_LINE, THUMB_CURRENT_PAGE_LINE);
         int w = thumbRenderPixels + 2 * line + THUMB_CARD_INSET_LEFT + THUMB_CARD_INSET_RIGHT;
         int h = thumbRenderPixels + 2 * line + THUMB_CARD_INSET_TOP + THUMB_CARD_INSET_BOTTOM + THUMB_CARD_LABEL_ROW;
         Dimension d = new Dimension(w, h);
         tb.setPreferredSize(d);
         tb.setMinimumSize(d);
         tb.setMaximumSize(d);
+    }
+
+    private static Border createThumbCardBorder(Color lineColor, int lineWidth) {
+        return BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(lineColor, lineWidth),
+                BorderFactory.createEmptyBorder(
+                        THUMB_CARD_INSET_TOP, THUMB_CARD_INSET_LEFT,
+                        THUMB_CARD_INSET_BOTTOM, THUMB_CARD_INSET_RIGHT));
+    }
+
+    private void applyDefaultThumbOutline(ThumbnailButton tb) {
+        tb.setBorder(createThumbCardBorder(THUMB_CARD_BORDER, THUMB_CARD_LINE));
+    }
+
+    private void applyCurrentPageThumbOutline(ThumbnailButton tb) {
+        tb.setBorder(createThumbCardBorder(THUMB_CURRENT_PAGE_BORDER, THUMB_CURRENT_PAGE_LINE));
+    }
+
+    /**
+     * Marks the thumbnail for {@code pageOneBased} as the page shown in the main viewer (border highlight).
+     */
+    public void setHighlightedPageOneBased(int pageOneBased) {
+        if (thumbnailButtons == null || thumbnailButtons.length == 0) {
+            return;
+        }
+        if (highlightedPageOneBased >= 1 && highlightedPageOneBased <= thumbnailButtons.length) {
+            ThumbnailButton prev = thumbnailButtons[highlightedPageOneBased - 1];
+            applyDefaultThumbOutline(prev);
+            applyButtonThumbSize(prev);
+        }
+        highlightedPageOneBased = -1;
+        if (pageOneBased < 1 || pageOneBased > thumbnailButtons.length) {
+            return;
+        }
+        highlightedPageOneBased = pageOneBased;
+        ThumbnailButton cur = thumbnailButtons[pageOneBased - 1];
+        applyCurrentPageThumbOutline(cur);
+        applyButtonThumbSize(cur);
     }
 
     private boolean iconApproximatelyMatchesThumb(Icon ic) {
@@ -307,6 +352,7 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
         this.document = newDoc;
         this.thumbnailRenderer = new PDFRenderer(newDoc);
         this.thumbnailButtons = new ThumbnailButton[newPages];
+        highlightedPageOneBased = -1;
         populateThumbnailButtons(reuseIcons);
         thumbnailViewportListener = new thumbnailGenControl();
         getViewport().addChangeListener(thumbnailViewportListener);
@@ -369,11 +415,7 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
             tb.setOpaque(true);
             tb.setBackground(Color.WHITE);
             tb.setMargin(new Insets(0, 0, 0, 0));
-            tb.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(THUMB_CARD_BORDER, THUMB_CARD_LINE),
-                    BorderFactory.createEmptyBorder(
-                            THUMB_CARD_INSET_TOP, THUMB_CARD_INSET_LEFT,
-                            THUMB_CARD_INSET_BOTTOM, THUMB_CARD_INSET_RIGHT)));
+            applyDefaultThumbOutline(tb);
             tb.setFocusPainted(false);
             tb.setHorizontalAlignment(SwingConstants.CENTER);
             tb.setVerticalTextPosition(AbstractButton.BOTTOM);
@@ -580,10 +622,22 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
         if (pageOneBased < 1) {
             return;
         }
-        SwingUtilities.invokeLater(() -> scrollPageThumbIntoViewNow(pageOneBased));
+        SwingUtilities.invokeLater(() -> scrollPageThumbIntoViewNow(pageOneBased, 12));
     }
 
-    private void scrollPageThumbIntoViewNow(int pageOneBased) {
+    /**
+     * When the thumbnails strip is not visible (e.g. bookmarks tab active), the viewport can still be
+     * 0×0 on the first EDT pass; defer one frame so scroll and highlight apply after layout.
+     */
+    private boolean shouldDeferThumbScrollForZeroViewport() {
+        Dimension ext = getViewport().getExtentSize();
+        return ext.width < 2 || ext.height < 2;
+    }
+
+    /**
+     * @param retriesLeft EDT retries while the viewport has no extent (e.g. layout not ready, tab just shown).
+     */
+    private void scrollPageThumbIntoViewNow(int pageOneBased, int retriesLeft) {
         if (thumbnailGenSuspended || thumbnailButtons == null || thumbnailButtons.length == 0) {
             return;
         }
@@ -600,14 +654,46 @@ public class ThumbnailsPane extends JScrollPane implements PageChangedListener {
         if (!SwingUtilities.isDescendingFrom(tb, this)) {
             return;
         }
+        setHighlightedPageOneBased(pageOneBased);
+
         validate();
         view.validate();
-        Rectangle viewRect = vp.getViewRect();
-        Rectangle tbInView = SwingUtilities.convertRectangle(tb.getParent(), tb.getBounds(), view);
-        if (viewRect.contains(tbInView)) {
+
+        if (shouldDeferThumbScrollForZeroViewport()) {
+            if (retriesLeft > 0) {
+                SwingUtilities.invokeLater(() -> scrollPageThumbIntoViewNow(pageOneBased, retriesLeft - 1));
+            }
             return;
         }
-        vp.scrollRectToVisible(tbInView);
+
+        Rectangle tbInView = SwingUtilities.convertRectangle(tb.getParent(), tb.getBounds(), view);
+        if (tbInView.isEmpty() && retriesLeft > 0) {
+            SwingUtilities.invokeLater(() -> scrollPageThumbIntoViewNow(pageOneBased, retriesLeft - 1));
+            return;
+        }
+        Rectangle viewRect = vp.getViewRect();
+        if (!tbInView.isEmpty() && viewRect.width > 0 && viewRect.height > 0 && viewRect.contains(tbInView)) {
+            return;
+        }
+
+        /*
+         * Do not use JViewport.scrollRectToVisible alone: with CardLayout / hidden tabs it often no-ops, so the
+         * strip stays on the wrong page until the user interacts. Minimal vertical scroll in view coordinates.
+         */
+        int extH = vp.getExtentSize().height;
+        int maxY = max(0, view.getHeight() - extH);
+        int y = vp.getViewPosition().y;
+        if (tbInView.height > extH) {
+            y = tbInView.y - THUMB_COLUMN_PAD_TOP;
+        } else if (tbInView.y < viewRect.y) {
+            y = tbInView.y - THUMB_COLUMN_PAD_TOP;
+        } else if (tbInView.y + tbInView.height > viewRect.y + viewRect.height) {
+            y = tbInView.y + tbInView.height - extH + THUMB_COLUMN_PAD_TOP;
+        } else if (!tbInView.isEmpty()) {
+            y = tbInView.y - THUMB_COLUMN_PAD_TOP;
+        }
+        y = min(max(0, y), maxY);
+        vp.setViewPosition(new Point(vp.getViewPosition().x, y));
     }
 
     /**

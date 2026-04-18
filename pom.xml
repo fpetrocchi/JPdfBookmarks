@@ -16,6 +16,15 @@
     <maven.compiler.release>21</maven.compiler.release>
     <langchain4j.version>1.12.2</langchain4j.version>
     <langchain4j.spring-boot-starter.version>1.12.2-beta22</langchain4j.spring-boot-starter.version>
+    <flatlaf.version>3.5.4</flatlaf.version>
+    <ikonli.version>12.3.1</ikonli.version>
+    <!-- Override in CI / settings.xml for cloud distribution builds (filtered into ai-cloud-defaults.properties). -->
+    <ai.cloud.process.index.url></ai.cloud.process.index.url>
+    <ai.cloud.anon.key></ai.cloud.anon.key>
+    <ai.cloud.check.payment.url></ai.cloud.check.payment.url>
+    <ai.cloud.fetch.full.url></ai.cloud.fetch.full.url>
+    <ai.cloud.stripe.checkout.mini.url></ai.cloud.stripe.checkout.mini.url>
+    <ai.cloud.stripe.checkout.advanced.url></ai.cloud.stripe.checkout.advanced.url>
   </properties>
   <licenses>
     <license>
@@ -241,6 +250,21 @@
         <groupId>it.flavianopetrocchi.jpdfbookmarks</groupId>
         <artifactId>iTextBookmarksConverter</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.formdev</groupId>
+        <artifactId>flatlaf</artifactId>
+        <version>${flatlaf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.kordamp.ikonli</groupId>
+        <artifactId>ikonli-swing</artifactId>
+        <version>${ikonli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.kordamp.ikonli</groupId>
+        <artifactId>ikonli-materialdesign2-pack</artifactId>
+        <version>${ikonli.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

@@ -21,6 +21,7 @@
  */
 package it.flavianopetrocchi.jpdfbookmarks;
 
+import com.formdev.flatlaf.FlatLightLaf;
 import it.flavianopetrocchi.components.collapsingpanel.CollapsingPanel;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -28,7 +29,6 @@ import java.awt.Toolkit;
 import java.nio.charset.Charset;
 import java.util.prefs.Preferences;
 import javax.swing.JFrame;
-import javax.swing.UIManager;
 
 /**
  * This class contains all the keys of the preferences for the program,
@@ -67,12 +67,23 @@ public class Prefs {
 
     private final String AI_PROVIDER = "AI_PROVIDER";
     private final String AI_OPENAI_API_KEY = "AI_OPENAI_API_KEY";
-    /** Chiave preferenza per il nome modello OpenAI; default effettivo {@code gpt-5.4-mini} in {@link #getOpenAiModel()}. */
+    /** Chiave preferenza per il nome modello OpenAI; l'app usa solo {@link #ALLOWED_OPENAI_MODEL_FOR_EXTRACTION}. */
     public static final String AI_OPENAI_MODEL = "AI_OPENAI_MODEL";
+
+    /**
+     * Unico modello OpenAI consentito per estrazione indice (locale e richiesta cloud), per sostenibilità economica
+     * rispetto al prezzo del flusso a pagamento.
+     */
+    public static final String ALLOWED_OPENAI_MODEL_FOR_EXTRACTION = "gpt-5.4-mini";
     private final String AI_OLLAMA_BASE_URL = "AI_OLLAMA_BASE_URL";
     private final String AI_OLLAMA_MODEL = "AI_OLLAMA_MODEL";
 
     private final String AI_EXTRACTION_MODE = "AI_EXTRACTION_MODE";
+    /**
+     * Se {@code true}, {@link #getAiExtractionMode()} usa solo le preferenze salvate; se {@code false} e i default
+     * bundled sono completi, la modalità cloud è scelta automaticamente (build distribuita senza tab IA).
+     */
+    private final String AI_EXTRACTION_MODE_EXPLICIT = "AI_EXTRACTION_MODE_EXPLICIT";
     private final String AI_CLOUD_PROCESS_INDEX_URL = "AI_CLOUD_PROCESS_INDEX_URL";
     private final String AI_CLOUD_ANON_KEY = "AI_CLOUD_ANON_KEY";
     private final String AI_CLOUD_CHECK_PAYMENT_URL = "AI_CLOUD_CHECK_PAYMENT_URL";
@@ -92,6 +103,13 @@ public class Prefs {
 
     /** Estrazione indice tramite Edge Function (es. Supabase) con immagini inviate al cloud. */
     public static final String AI_EXTRACTION_MODE_CLOUD = "CLOUD";
+
+    /**
+     * Allineato al default backend {@code FREE_PREVIEW_MAX_INDEX_PAGES}: intervallo indice consigliato per anteprima
+     * cloud in un solo invio; oltre questo numero l'utente deve confermare il ridimensionamento o il backend può
+     * limitare/ratelimitare.
+     */
+    public static final int CLOUD_FREE_PREVIEW_MAX_INDEX_PAGES = 3;
 
     public static final String SHOW_FILE_TB = "SHOW_FILE_TB";
     public static final String SHOW_FITTYPE_TB = "SHOW_FITTYPE_TB";
@@ -287,8 +305,7 @@ public class Prefs {
     }
 
     public String getLAF() {
-        String currentLAF = UIManager.getSystemLookAndFeelClassName();
-        return userPrefs.get(LAF, currentLAF);
+        return userPrefs.get(LAF, FlatLightLaf.class.getName());
     }
 
     public void setLAF(String laf) {
@@ -374,20 +391,14 @@ public class Prefs {
     }
 
     /**
-     * Nome modello OpenAI per le funzioni IA (es. estrazione indice). Preferenza {@code AI_OPENAI_MODEL};
-     * se assente o vuota si usa {@code gpt-5.4-mini}.
+     * Nome modello OpenAI per le funzioni IA (es. estrazione indice): sempre {@value #ALLOWED_OPENAI_MODEL_FOR_EXTRACTION}.
      */
     public String getOpenAiModel() {
-        String v = userPrefs.get(AI_OPENAI_MODEL, "gpt-5.4-mini");
-        if (v == null) {
-            return "gpt-5.4-mini";
-        }
-        v = v.trim();
-        return v.isEmpty() ? "gpt-5.4-mini" : v;
+        return ALLOWED_OPENAI_MODEL_FOR_EXTRACTION;
     }
 
     public void setOpenAiModel(String value) {
-        userPrefs.put(AI_OPENAI_MODEL, value != null ? value.trim() : "");
+        userPrefs.put(AI_OPENAI_MODEL, ALLOWED_OPENAI_MODEL_FOR_EXTRACTION);
     }
 
     public String getOllamaBaseUrl() {
@@ -407,14 +418,25 @@ public class Prefs {
     }
 
     /**
-     * {@value #AI_EXTRACTION_MODE_LOCAL} oppure {@value #AI_EXTRACTION_MODE_CLOUD}; default locale.
+     * {@value #AI_EXTRACTION_MODE_LOCAL} oppure {@value #AI_EXTRACTION_MODE_CLOUD}. Senza scelta esplicita in
+     * opzioni, se {@link AiCloudBundledDefaults} fornisce URL e chiave anon, si usa {@value #AI_EXTRACTION_MODE_CLOUD}.
      */
     public String getAiExtractionMode() {
-        String v = userPrefs.get(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL);
-        if (v == null || v.isBlank()) {
-            return AI_EXTRACTION_MODE_LOCAL;
+        if (isAiExtractionModeExplicitlyChosen()) {
+            return normalizeAiExtractionMode(userPrefs.get(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL));
         }
-        return v.trim().toUpperCase(java.util.Locale.ROOT);
+        if (AiCloudBundledDefaults.get().isCloudConfigComplete()) {
+            return AI_EXTRACTION_MODE_CLOUD;
+        }
+        return normalizeAiExtractionMode(userPrefs.get(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL));
+    }
+
+    public boolean isAiExtractionModeExplicitlyChosen() {
+        return userPrefs.getBoolean(AI_EXTRACTION_MODE_EXPLICIT, false);
+    }
+
+    public void setAiExtractionModeExplicitlyChosen(boolean value) {
+        userPrefs.putBoolean(AI_EXTRACTION_MODE_EXPLICIT, value);
     }
 
     public void setAiExtractionMode(String value) {
@@ -430,6 +452,13 @@ public class Prefs {
         }
     }
 
+    private static String normalizeAiExtractionMode(String v) {
+        if (v == null || v.isBlank()) {
+            return AI_EXTRACTION_MODE_LOCAL;
+        }
+        return v.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
     /** True se l'utente ha scelto il cloud e URL/anon key non sono vuoti. */
     public boolean isCloudIndexExtraction() {
         return AI_EXTRACTION_MODE_CLOUD.equals(getAiExtractionMode())
@@ -438,7 +467,11 @@ public class Prefs {
     }
 
     public String getCloudProcessIndexUrl() {
-        return userPrefs.get(AI_CLOUD_PROCESS_INDEX_URL, "");
+        String v = userPrefs.get(AI_CLOUD_PROCESS_INDEX_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        return AiCloudBundledDefaults.get().processIndexUrl();
     }
 
     public void setCloudProcessIndexUrl(String value) {
@@ -446,7 +479,11 @@ public class Prefs {
     }
 
     public String getCloudSupabaseAnonKey() {
-        return userPrefs.get(AI_CLOUD_ANON_KEY, "");
+        String v = userPrefs.get(AI_CLOUD_ANON_KEY, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        return AiCloudBundledDefaults.get().anonKey();
     }
 
     public void setCloudSupabaseAnonKey(String value) {
@@ -454,7 +491,11 @@ public class Prefs {
     }
 
     public String getCloudCheckPaymentUrl() {
-        return userPrefs.get(AI_CLOUD_CHECK_PAYMENT_URL, "");
+        String v = userPrefs.get(AI_CLOUD_CHECK_PAYMENT_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        return AiCloudBundledDefaults.get().checkPaymentUrl();
     }
 
     public void setCloudCheckPaymentUrl(String value) {
@@ -476,7 +517,19 @@ public class Prefs {
             return v.trim();
         }
         String legacy = userPrefs.get(AI_CLOUD_FETCH_BOOKMARKS_URL, "");
-        return legacy != null ? legacy.trim() : "";
+        if (legacy != null && !legacy.trim().isEmpty()) {
+            return legacy.trim();
+        }
+        String bundled = AiCloudBundledDefaults.get().fetchFullUrl();
+        if (bundled != null && !bundled.isEmpty()) {
+            return bundled;
+        }
+        /* Stesso endpoint di check-payment: il backend restituisce già bookmarks quando paid=true. */
+        String check = getCloudCheckPaymentUrl();
+        if (check != null && !check.trim().isEmpty()) {
+            return check.trim();
+        }
+        return "";
     }
 
     public void setCloudFetchFullResultsUrl(String value) {
@@ -484,7 +537,11 @@ public class Prefs {
     }
 
     public String getCloudStripeCheckoutMiniUrl() {
-        return userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, "");
+        String v = userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        return AiCloudBundledDefaults.get().stripeCheckoutMiniUrl();
     }
 
     public void setCloudStripeCheckoutMiniUrl(String value) {
@@ -492,7 +549,11 @@ public class Prefs {
     }
 
     public String getCloudStripeCheckoutAdvancedUrl() {
-        return userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, "");
+        String v = userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        return AiCloudBundledDefaults.get().stripeCheckoutAdvancedUrl();
     }
 
     public void setCloudStripeCheckoutAdvancedUrl(String value) {
@@ -500,32 +561,15 @@ public class Prefs {
     }
 
     /**
-     * Modello opzionale per {@code process-index}: {@value #CLOUD_PROCESS_INDEX_MODEL_STANDARD} o
-     * {@value #CLOUD_PROCESS_INDEX_MODEL_ADVANCED}.
+     * Tier inviato a {@code process-index}: solo {@value #CLOUD_PROCESS_INDEX_MODEL_STANDARD} (nessun tier
+     * {@code advanced}) per allineare i costi al modello economico.
      */
     public String getCloudProcessIndexModel() {
-        String v = userPrefs.get(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
-        if (v == null || v.isBlank()) {
-            return CLOUD_PROCESS_INDEX_MODEL_STANDARD;
-        }
-        v = v.trim().toLowerCase(java.util.Locale.ROOT);
-        if (CLOUD_PROCESS_INDEX_MODEL_ADVANCED.equals(v)) {
-            return CLOUD_PROCESS_INDEX_MODEL_ADVANCED;
-        }
         return CLOUD_PROCESS_INDEX_MODEL_STANDARD;
     }
 
     public void setCloudProcessIndexModel(String value) {
-        if (value == null || value.isBlank()) {
-            userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
-            return;
-        }
-        String u = value.trim().toLowerCase(java.util.Locale.ROOT);
-        if (CLOUD_PROCESS_INDEX_MODEL_ADVANCED.equals(u)) {
-            userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_ADVANCED);
-        } else {
-            userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
-        }
+        userPrefs.put(AI_CLOUD_PROCESS_INDEX_MODEL, CLOUD_PROCESS_INDEX_MODEL_STANDARD);
     }
 
 }

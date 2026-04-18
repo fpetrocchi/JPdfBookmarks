@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import it.flavianopetrocchi.jpdfbookmarks.Prefs;
 import it.flavianopetrocchi.jpdfbookmarks.Res;
 import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
 import java.io.IOException;
@@ -80,17 +82,29 @@ public final class SupabaseAiClient {
     }
 
     /**
-     * Invia l'indice al backend Supabase. Il payload segue {@code process-index}: {@code imageBase64},
-     * {@code textLayerContent} (testo layer come in {@code BookmarkExtractorAgent}), opzionale {@code model}
-     * ({@code standard} / {@code advanced}), duplicato anche come {@code tier} per compatibilità con backend che
-     * leggono quel nome. I parametri {@code startPage}/{@code endPage} non sono letti dall'edge
-     * attuale ma restano utili in log lato client.
-     */
-    /**
-     * Costruisce il corpo JSON inviato a {@code process-index} (stesso payload di {@link #submitProcessIndexWithJson}).
+     * Costruisce il corpo JSON inviato a {@code process-index} (stesso payload di {@link #submitProcessIndexWithJson}):
+     * {@code imageBase64}, {@code textLayerContent} (testo layer come in {@code BookmarkExtractorAgent}), opzionale
+     * {@code model} ({@code standard} / {@code advanced}) e {@code tier} per compatibilità backend, e sempre
+     * {@code openai_model} uguale a {@link Prefs#ALLOWED_OPENAI_MODEL_FOR_EXTRACTION} affinché la Edge Function usi
+     * quel modello OpenAI (se il backend legge questo campo). I campi {@code start_page}/{@code end_page} restano utili in log lato client.
      */
     public String buildProcessIndexJsonPayload(
             int startPage, int endPage, String indexPlainText, byte[] indexPngBytes, String model)
+            throws AiOrchestrationException {
+        return buildProcessIndexJsonPayload(startPage, endPage, indexPlainText, indexPngBytes, model, null);
+    }
+
+    /**
+     * @param extendPaidTaskId se non vuoto, invia {@code extend_paid_task_id} perrieseguire l'estrazione sul record già
+     *                         pagato con un intervallo di pagine indice più ampio (backend pdfbookmarks).
+     */
+    public String buildProcessIndexJsonPayload(
+            int startPage,
+            int endPage,
+            String indexPlainText,
+            byte[] indexPngBytes,
+            String model,
+            String extendPaidTaskId)
             throws AiOrchestrationException {
         if (indexPngBytes == null || indexPngBytes.length == 0) {
             throw new AiOrchestrationException("Index image bytes are empty; nothing to send to the cloud.", null);
@@ -108,6 +122,10 @@ public final class SupabaseAiClient {
                 root.put("tier", m);
             }
         }
+        root.put("openai_model", Prefs.ALLOWED_OPENAI_MODEL_FOR_EXTRACTION);
+        if (extendPaidTaskId != null && !extendPaidTaskId.isBlank()) {
+            root.put("extend_paid_task_id", extendPaidTaskId.trim());
+        }
         try {
             return MAPPER.writeValueAsString(root);
         } catch (Exception e) {
@@ -120,6 +138,15 @@ public final class SupabaseAiClient {
      * una seconda serializzazione.
      */
     public CloudIndexResult submitProcessIndexWithJson(String jsonBody) throws AiOrchestrationException {
+        return submitProcessIndexWithJson(jsonBody, null);
+    }
+
+    /**
+     * Come {@link #submitProcessIndexWithJson(String)}; se {@code extractionDebugTimestamp} non è vuoto e la
+     * persistenza debug è attiva, salva la risposta in {@code ai_debug/debug_supabase_response_[timestamp].json}.
+     */
+    public CloudIndexResult submitProcessIndexWithJson(String jsonBody, String extractionDebugTimestamp)
+            throws AiOrchestrationException {
         if (processIndexUrl.isEmpty()) {
             throw new AiOrchestrationException("Cloud process-index URL is empty.", null);
         }
@@ -130,6 +157,7 @@ public final class SupabaseAiClient {
             throw new AiOrchestrationException("Cloud request JSON is empty.", null);
         }
         String body = httpPostJson(processIndexUrl, jsonBody);
+        AiExtractionDebugRecorder.tryWriteSupabaseResponseDebug(extractionDebugTimestamp, body);
         return parseProcessIndexResponse(body);
     }
 
@@ -137,7 +165,7 @@ public final class SupabaseAiClient {
             int startPage, int endPage, String indexPlainText, byte[] indexPngBytes, String model)
             throws AiOrchestrationException {
         return submitProcessIndexWithJson(
-                buildProcessIndexJsonPayload(startPage, endPage, indexPlainText, indexPngBytes, model));
+                buildProcessIndexJsonPayload(startPage, endPage, indexPlainText, indexPngBytes, model, null), null);
     }
 
     /**
@@ -156,11 +184,17 @@ public final class SupabaseAiClient {
         }
         boolean paid = paidFlagFromCheckPaymentJson(node);
         String modelType = readPaidModelType(node);
+        if (modelType.isEmpty()) {
+            JsonNode dataForModel = unwrapData(node);
+            if (dataForModel != null) {
+                modelType = readPaidModelType(dataForModel);
+            }
+        }
         List<AiBookmark> bookmarks = List.of();
         if (paid) {
-            List<AiBookmark> parsed = parseBookmarkArray(node);
-            if (parsed != null) {
-                bookmarks = parsed;
+            bookmarks = parseBookmarksFromResponseNode(node);
+            if (bookmarks.isEmpty()) {
+                AiExtractionDebugRecorder.tryWriteCheckPaymentDebug(taskId, body);
             }
         }
         return new CheckPaymentResult(paid, bookmarks, paid ? modelType : "");
@@ -214,17 +248,16 @@ public final class SupabaseAiClient {
             try {
                 List<AiBookmark> direct =
                         MAPPER.readValue(root.traverse(), new TypeReference<List<AiBookmark>>() {});
-                return direct != null ? direct : List.of();
-            } catch (IOException e) {
-                throw new AiOrchestrationException("Fetch response array is not a bookmark list.", e);
+                if (direct != null && !direct.isEmpty()) {
+                    return direct;
+                }
+            } catch (IOException ignored) {
+                // fallback: parsing tollerante elemento per elemento
             }
+            return parseBookmarkArrayLenient(root);
         }
         JsonNode data = unwrapData(root);
-        List<AiBookmark> list = parseBookmarkArray(data != null ? data : root);
-        if (list == null) {
-            list = parseBookmarkArray(root);
-        }
-        return list != null ? list : List.of();
+        return parseBookmarksFromResponseNode(data != null ? data : root);
     }
 
     private CloudIndexResult parseProcessIndexResponse(String body) throws AiOrchestrationException {
@@ -246,12 +279,9 @@ public final class SupabaseAiClient {
         if (taskId.isEmpty()) {
             taskId = readTaskId(root);
         }
-        List<AiBookmark> bookmarks = parseBookmarkArray(payload);
-        if (bookmarks == null) {
-            bookmarks = parseBookmarkArray(root);
-        }
-        if (bookmarks == null) {
-            bookmarks = List.of();
+        List<AiBookmark> bookmarks = parseBookmarksFromResponseNode(payload);
+        if (bookmarks.isEmpty()) {
+            bookmarks = parseBookmarksFromResponseNode(root);
         }
         return new CloudIndexResult(taskId, bookmarks);
     }
@@ -322,7 +352,62 @@ public final class SupabaseAiClient {
         return firstText(node, fieldNames);
     }
 
-    private List<AiBookmark> parseBookmarkArray(JsonNode node) {
+    /**
+     * Estrae {@code bookmarks} / {@code items} dal nodo o da {@link #unwrapData(JsonNode)} se l'array è annidato
+     * (gateway che wrappa la risposta).
+     */
+    static List<AiBookmark> parseBookmarksFromResponseNode(JsonNode node) {
+        if (node == null) {
+            return List.of();
+        }
+        JsonNode target = nodeForBookmarkArray(node);
+        if (target == null) {
+            return List.of();
+        }
+        List<AiBookmark> strict = parseBookmarkArrayStrict(target);
+        if (strict != null && !strict.isEmpty()) {
+            return strict;
+        }
+        JsonNode arr = bookmarkArrayField(target);
+        if (arr != null && arr.isArray() && !arr.isEmpty() && (strict == null || strict.isEmpty())) {
+            List<AiBookmark> lenient = parseBookmarkArrayLenient(arr);
+            if (!lenient.isEmpty()) {
+                return lenient;
+            }
+        }
+        return strict != null ? strict : List.of();
+    }
+
+    private static JsonNode nodeForBookmarkArray(JsonNode root) {
+        if (root == null) {
+            return null;
+        }
+        if (bookmarkArrayField(root) != null) {
+            return root;
+        }
+        JsonNode d = unwrapData(root);
+        if (d != null && bookmarkArrayField(d) != null) {
+            return d;
+        }
+        return root;
+    }
+
+    private static JsonNode bookmarkArrayField(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return null;
+        }
+        JsonNode arr = node.get("bookmarks");
+        if (arr != null && arr.isArray()) {
+            return arr;
+        }
+        arr = node.get("items");
+        if (arr != null && arr.isArray()) {
+            return arr;
+        }
+        return null;
+    }
+
+    private static List<AiBookmark> parseBookmarkArrayStrict(JsonNode node) {
         if (node == null) {
             return null;
         }
@@ -338,6 +423,107 @@ public final class SupabaseAiClient {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** Ricostruisce l'albero senza deserializzazione Jackson su tutta la lista (tollera {@code page_number} stringa/numero). */
+    private static List<AiBookmark> parseBookmarkArrayLenient(JsonNode arr) {
+        List<AiBookmark> out = new ArrayList<>();
+        for (JsonNode el : arr) {
+            AiBookmark one = bookmarkFromJsonNodeLenient(el);
+            if (one != null) {
+                out.add(one);
+            }
+        }
+        return out;
+    }
+
+    private static AiBookmark bookmarkFromJsonNodeLenient(JsonNode el) {
+        if (el == null || el.isNull()) {
+            return null;
+        }
+        if (el.isObject()) {
+            AiBookmark b = new AiBookmark();
+            b.setTitle(readBookmarkTitle(el));
+            b.setPageNumber(readBookmarkPageNumber(el));
+            JsonNode ch = el.get("children");
+            if (ch == null || !ch.isArray()) {
+                ch = el.get("items");
+            }
+            if (ch == null || !ch.isArray()) {
+                ch = el.get("nodes");
+            }
+            if (ch == null || !ch.isArray()) {
+                ch = el.get("bookmarks");
+            }
+            if (ch != null && ch.isArray()) {
+                for (JsonNode c : ch) {
+                    AiBookmark child = bookmarkFromJsonNodeLenient(c);
+                    if (child != null) {
+                        b.addChild(child);
+                    }
+                }
+            }
+            return b;
+        }
+        return null;
+    }
+
+    private static String readBookmarkTitle(JsonNode o) {
+        JsonNode t = o.get("title");
+        if (t == null) {
+            t = o.get("name");
+        }
+        if (t == null) {
+            t = o.get("label");
+        }
+        if (t == null) {
+            t = o.get("text");
+        }
+        if (t == null || t.isNull()) {
+            return "";
+        }
+        if (t.isTextual()) {
+            return t.asText();
+        }
+        return String.valueOf(t);
+    }
+
+    private static Integer readBookmarkPageNumber(JsonNode o) {
+        JsonNode p = o.get("page_number");
+        if (p == null) {
+            p = o.get("pageNumber");
+        }
+        if (p == null) {
+            p = o.get("page");
+        }
+        if (p == null) {
+            p = o.get("pg");
+        }
+        if (p == null || p.isNull()) {
+            return null;
+        }
+        if (p.isInt() || p.isLong()) {
+            return p.intValue();
+        }
+        if (p.isDouble() || p.isFloat()) {
+            double d = p.asDouble();
+            if (Double.isFinite(d)) {
+                return (int) Math.round(d);
+            }
+            return null;
+        }
+        if (p.isTextual()) {
+            String s = p.asText().trim();
+            if (s.isEmpty()) {
+                return null;
+            }
+            try {
+                return Integer.parseInt(s.replaceFirst("^p\\.?\\s*", ""), 10);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static JsonNode readTree(String body) throws AiOrchestrationException {
@@ -397,8 +583,13 @@ public final class SupabaseAiClient {
     }
 
     private static AiOrchestrationException cloudHttpError(int code, String body) {
-        String snippet = abbreviate(body);
-        if (code == 401) {
+        GatewayErrorBody parsed = parseGatewayErrorJson(body);
+        boolean openAiUpstream401 =
+                parsed != null
+                        && parsed.innerHttpStatus == 401
+                        && parsed.looksLikeOpenAiPermissionFailure();
+        if (code == 401 && !openAiUpstream401) {
+            String snippet = abbreviate(body);
             return new AiOrchestrationException(
                     "Cloud request failed (HTTP 401): "
                             + snippet
@@ -406,7 +597,96 @@ public final class SupabaseAiClient {
                             + Res.getString("AI_CLOUD_HTTP_401_HINT"),
                     null);
         }
-        return new AiOrchestrationException("Cloud request failed (HTTP " + code + "): " + snippet, null);
+        String headline = "Cloud request failed (HTTP " + code + ")";
+        String detail =
+                parsed != null && !parsed.summaryLine().isBlank()
+                        ? parsed.summaryLine()
+                        : abbreviate(body);
+        String hint =
+                openAiUpstream401
+                        ? Res.getString("AI_CLOUD_HTTP_UPSTREAM_OPENAI_HINT")
+                        : (code == 401 ? Res.getString("AI_CLOUD_HTTP_401_HINT") : "");
+        if (hint != null && !hint.isBlank()) {
+            return new AiOrchestrationException(headline + ":\n" + detail + "\n\n" + hint, null);
+        }
+        return new AiOrchestrationException(headline + ": " + detail, null);
+    }
+
+    /**
+     * Corpo errore da Edge (es. 502) con JSON tipo {@code error}, {@code status} upstream e {@code details} stringa
+     * JSON annidata (OpenAI).
+     */
+    private record GatewayErrorBody(String summaryLine, int innerHttpStatus) {
+        boolean looksLikeOpenAiPermissionFailure() {
+            if (innerHttpStatus != 401) {
+                return false;
+            }
+            String b = summaryLine.toLowerCase(Locale.ROOT);
+            return b.contains("openai")
+                    || b.contains("insufficient permissions")
+                    || b.contains("missing scopes")
+                    || b.contains("model.request")
+                    || b.contains("organization");
+        }
+    }
+
+    private static GatewayErrorBody parseGatewayErrorJson(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = MAPPER.readTree(body);
+            if (root == null || !root.isObject()) {
+                return null;
+            }
+            String topError = firstText(root, "error", "message");
+            int innerStatus = -1;
+            JsonNode st = root.get("status");
+            if (st != null && st.isNumber()) {
+                innerStatus = st.asInt();
+            }
+            String detailsRaw = "";
+            JsonNode det = root.get("details");
+            if (det != null && det.isTextual()) {
+                detailsRaw = det.asText();
+            }
+            String innerMessage = "";
+            if (!detailsRaw.isBlank()) {
+                try {
+                    JsonNode inner = MAPPER.readTree(detailsRaw);
+                    if (inner != null && inner.isObject()) {
+                        JsonNode errObj = inner.get("error");
+                        if (errObj != null && errObj.isObject()) {
+                            innerMessage = firstText(errObj, "message", "code");
+                        }
+                    }
+                } catch (Exception ignored) {
+                    innerMessage = abbreviate(detailsRaw, 500);
+                }
+            }
+            StringBuilder line = new StringBuilder();
+            if (topError != null && !topError.isBlank()) {
+                line.append(topError.trim());
+            }
+            if (innerStatus >= 0) {
+                if (line.length() > 0) {
+                    line.append(" — ");
+                }
+                line.append("upstream HTTP ").append(innerStatus);
+            }
+            if (innerMessage != null && !innerMessage.isBlank()) {
+                if (line.length() > 0) {
+                    line.append(": ");
+                }
+                line.append(innerMessage.trim());
+            }
+            if (line.length() == 0) {
+                return null;
+            }
+            return new GatewayErrorBody(abbreviate(line.toString(), 900), innerStatus);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static String appendQueryTaskId(String baseUrl, String taskId) throws AiOrchestrationException {
@@ -422,10 +702,14 @@ public final class SupabaseAiClient {
     }
 
     private static String abbreviate(String s) {
+        return abbreviate(s, 400);
+    }
+
+    private static String abbreviate(String s, int maxLen) {
         if (s == null) {
             return "";
         }
         String t = s.trim().replace('\n', ' ');
-        return t.length() > 400 ? t.substring(0, 400) + "…" : t;
+        return t.length() > maxLen ? t.substring(0, maxLen) + "…" : t;
     }
 }

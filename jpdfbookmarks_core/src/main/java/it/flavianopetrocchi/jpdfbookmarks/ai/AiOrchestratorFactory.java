@@ -19,7 +19,7 @@ import java.util.Objects;
  * (scheda &quot;Artificial intelligence&quot; / &quot;Intelligenza artificiale&quot; nelle opzioni).
  * <p>
  * Provider {@code OPENAI}: richiede {@link Prefs#getOpenAiApiKey()}; il modello è {@link Prefs#getOpenAiModel()}
- * (default {@code gpt-5.4-mini}, sovrascrivibile con la preferenza {@code AI_OPENAI_MODEL}).
+ * (fisso {@code gpt-5.4-mini}; vedi {@link Prefs#ALLOWED_OPENAI_MODEL_FOR_EXTRACTION}).
  * Rendering indice a {@link PdfVisionService#DEFAULT_RENDER_DPI} (300 DPI); timeout HTTP 60 secondi.
  * <p>
  * Provider {@code OLLAMA}: {@link Prefs#getOllamaBaseUrl()} e {@link Prefs#getOllamaModel()}.
@@ -80,8 +80,7 @@ public final class AiOrchestratorFactory {
                             prefs.getCloudCheckPaymentUrl(),
                             prefs.getCloudFetchFullResultsUrl());
             PdfVisionService vision = new PdfVisionService(OPENAI_INDEX_RENDER_DPI);
-            return new AiOrchestrator(
-                    vision, null, false, cloud, Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD);
+            return new AiOrchestrator(vision, null, false, cloud, prefs.getCloudProcessIndexModel());
         }
         if (Prefs.AI_EXTRACTION_MODE_CLOUD.equals(prefs.getAiExtractionMode())) {
             throw new IllegalStateException(Res.getString("AI_ERROR_CLOUD_EXTRACTION_HINT"));

@@ -33,6 +33,11 @@ public class OptionsDlg extends javax.swing.JDialog {
     public final static int PROXY_PANEL = 1;
     public final static int TOOLBARS_PANEL = 2;
 
+    /** Sviluppo: {@code -Djpdfbookmarks.dev.showAiOptions=true} per mostrare il tab IA (nascosto agli utenti finali). */
+    public static boolean isAiOptionsTabVisible() {
+        return Boolean.getBoolean("jpdfbookmarks.dev.showAiOptions");
+    }
+
     private Prefs userPrefs = new Prefs();
     private SeparatorsPanel separatorsOptions = new SeparatorsPanel(userPrefs);
     private ConnectionOptionsPanel connectionOptions = new ConnectionOptionsPanel(userPrefs);
@@ -59,9 +64,12 @@ public class OptionsDlg extends javax.swing.JDialog {
         mainTabPane.addTab(Res.getString("TAB_CONNECTION_OPTIONS"), connectionOptions);
         mainTabPane.setMnemonicAt(0, Res.mnemonicFromRes("TAB_CONNECTION_OPTIONS_MNEMONIC"));
         mainTabPane.addTab(Res.getString("TAB_TOOLBARS_MANAGER"), toolbarsOptions);
-        aiOptions.loadSettings(userPrefs);
-        mainTabPane.addTab(Res.getString("TAB_AI_OPTIONS"), aiOptions);
-        mainTabPane.setMnemonicAt(4, Res.mnemonicFromRes("TAB_AI_OPTIONS_MNEMONIC"));
+        if (isAiOptionsTabVisible()) {
+            aiOptions.loadSettings(userPrefs);
+            mainTabPane.addTab(Res.getString("TAB_AI_OPTIONS"), aiOptions);
+            mainTabPane.setMnemonicAt(
+                    mainTabPane.getTabCount() - 1, Res.mnemonicFromRes("TAB_AI_OPTIONS_MNEMONIC"));
+        }
 //        mainTabPane.setMnemonicAt(0, Res.mnemonicFromRes("TAB_ENCODING_OPTIONS_MNEMONIC"));
 //        mainTabPane.add(Res.getString("TAB_ENCODING_OPTIONS"), encodingOptions);
 
@@ -198,7 +206,9 @@ public class OptionsDlg extends javax.swing.JDialog {
 
             userPrefs.setNeverAskWebAccess(connectionOptions.neverAskWebAccess());
 
-            aiOptions.saveSettings(userPrefs);
+            if (isAiOptionsTabVisible()) {
+                aiOptions.saveSettings(userPrefs);
+            }
 
             toolbarsOptions.saveToolbarPreferences();
             // if called from menubar of JPdfBookmarksGui (not on macOS!)

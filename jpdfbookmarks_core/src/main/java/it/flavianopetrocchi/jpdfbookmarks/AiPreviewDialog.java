@@ -2,11 +2,14 @@ package it.flavianopetrocchi.jpdfbookmarks;
 
 import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrationException;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.CloudPaidBookmarksFetcher;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.ProcessIndexResult;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.SupabaseAiClient;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -44,6 +47,7 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
+import org.apache.pdfbox.pdmodel.PDDocument;
 
 /**
  * Anteprima indice (parte dei segnalibri leggibili fino al pagamento), acquisto Standard via Stripe, verifica stato
@@ -74,6 +78,14 @@ public class AiPreviewDialog extends JDialog {
      * numeri di pagina positivi, così anteprima e navigazione coincidono con i segnalibri dopo l'acquisto.
      */
     private final int pageNumberOffset;
+    /**
+     * Intervallo indice scelto dall'utente prima del clamp anteprima cloud; 0/0 = non usare riesecuzione pagata estesa.
+     */
+    private final PDDocument indexDocument;
+
+    private final AiOrchestrator orchestratorForExtension;
+    private final int userFullIndexStart;
+    private final int userFullIndexEnd;
     private final JTextArea statusArea = new JTextArea(2, 36);
     private final JLabel lblError = new JLabel(" ");
     private final AtomicBoolean pollingActive = new AtomicBoolean(false);
@@ -127,6 +139,38 @@ public class AiPreviewDialog extends JDialog {
             Consumer<List<AiBookmark>> onPaidBookmarksReady,
             IPdfView pdfNavigationView,
             int pageNumberOffset) {
+        this(
+                owner,
+                paymentConfig,
+                taskId,
+                previewBookmarks,
+                onPaidBookmarksReady,
+                pdfNavigationView,
+                pageNumberOffset,
+                null,
+                null,
+                0,
+                0);
+    }
+
+    /**
+     * @param indexDocument          PDF perrieseguire {@code process-index} su tutte le pagine indice dopo il pagamento
+     * @param orchestratorForExtension orchestrator cloud (stesso della finestra indice)
+     * @param userFullIndexStart     prima pagina indice scelta dall'utente (prima del clamp a 3 pagine)
+     * @param userFullIndexEnd       ultima pagina indice scelta dall'utente
+     */
+    public AiPreviewDialog(
+            Frame owner,
+            AiPreviewPaymentConfig paymentConfig,
+            String taskId,
+            List<AiBookmark> previewBookmarks,
+            Consumer<List<AiBookmark>> onPaidBookmarksReady,
+            IPdfView pdfNavigationView,
+            int pageNumberOffset,
+            PDDocument indexDocument,
+            AiOrchestrator orchestratorForExtension,
+            int userFullIndexStart,
+            int userFullIndexEnd) {
         super(owner, false);
         this.paymentConfig = Objects.requireNonNull(paymentConfig, "paymentConfig");
         this.taskId = taskId != null ? taskId.trim() : "";
@@ -134,6 +178,10 @@ public class AiPreviewDialog extends JDialog {
         this.onPaidBookmarksReady = Objects.requireNonNull(onPaidBookmarksReady, "onPaidBookmarksReady");
         this.pdfNavigationView = pdfNavigationView;
         this.pageNumberOffset = pageNumberOffset;
+        this.indexDocument = indexDocument;
+        this.orchestratorForExtension = orchestratorForExtension;
+        this.userFullIndexStart = userFullIndexStart;
+        this.userFullIndexEnd = userFullIndexEnd;
         this.fetcher = CloudPaidBookmarksFetcher.fromAiPreviewPaymentConfig(paymentConfig);
 
         setTitle(Res.getString("AI_PREVIEW_WINDOW_TITLE"));
@@ -527,6 +575,22 @@ public class AiPreviewDialog extends JDialog {
         }.execute();
     }
 
+    private boolean needsFullPaidReextract() {
+        if (orchestratorForExtension == null
+                || indexDocument == null
+                || !orchestratorForExtension.usesCloudService()) {
+            return false;
+        }
+        if (!hasTaskId) {
+            return false;
+        }
+        if (userFullIndexStart < 1 || userFullIndexEnd < userFullIndexStart) {
+            return false;
+        }
+        int span = userFullIndexEnd - userFullIndexStart + 1;
+        return span > Prefs.CLOUD_FREE_PREVIEW_MAX_INDEX_PAGES;
+    }
+
     private void fetchFullAndFinish() {
         new SwingWorker<List<AiBookmark>, Void>() {
             @Override
@@ -563,6 +627,56 @@ public class AiPreviewDialog extends JDialog {
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
+        if (needsFullPaidReextract()) {
+            statusArea.setText(Res.getString("AI_PREVIEW_REEXTRACT_FULL_INDEX_STATUS"));
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            new SwingWorker<ProcessIndexResult, Void>() {
+                @Override
+                protected ProcessIndexResult doInBackground() throws Exception {
+                    return orchestratorForExtension.processIndex(
+                            indexDocument, userFullIndexStart, userFullIndexEnd, taskId);
+                }
+
+                @Override
+                protected void done() {
+                    setCursor(Cursor.getDefaultCursor());
+                    if (!isDisplayable()) {
+                        return;
+                    }
+                    try {
+                        ProcessIndexResult r = get();
+                        List<AiBookmark> bm = r.getBookmarks();
+                        if (bm != null && !bm.isEmpty()) {
+                            finishWithBookmarksAndClose(bm);
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                    AiPreviewDialog.this,
+                                    Res.getString("AI_PREVIEW_REEXTRACT_FAILED"),
+                                    Res.getString("AI_PREVIEW_WINDOW_TITLE"),
+                                    JOptionPane.WARNING_MESSAGE);
+                            finishWithBookmarksAndClose(list);
+                        }
+                    } catch (Exception ex) {
+                        Throwable c = ex.getCause() != null ? ex.getCause() : ex;
+                        String msg =
+                                c instanceof AiOrchestrationException
+                                        ? c.getMessage()
+                                        : (c.getMessage() != null ? c.getMessage() : ex.toString());
+                        JOptionPane.showMessageDialog(
+                                AiPreviewDialog.this,
+                                msg + "\n\n" + Res.getString("AI_PREVIEW_REEXTRACT_FAILED"),
+                                Res.getString("AI_INDEX_ERROR_TITLE"),
+                                JOptionPane.ERROR_MESSAGE);
+                        finishWithBookmarksAndClose(list);
+                    }
+                }
+            }.execute();
+            return;
+        }
+        finishWithBookmarksAndClose(list);
+    }
+
+    private void finishWithBookmarksAndClose(List<AiBookmark> list) {
         closeAndStop();
         dispose();
         onPaidBookmarksReady.accept(list);

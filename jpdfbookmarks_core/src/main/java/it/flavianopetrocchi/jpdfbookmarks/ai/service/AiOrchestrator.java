@@ -39,8 +39,10 @@ import org.apache.pdfbox.pdmodel.PDDocument;
  * <strong>Cartella {@code ai_debug}</strong> (sotto {@code user.dir}, di solito la root del progetto in IDE):
  * <ul>
  *   <li>Per ogni tentativo di estrazione vengono sempre scritti (salvo {@code -Djpdfbookmarks.ai.debug.persist=false})
- *       {@code payload_request_*.json} e {@code ocr_debug_*.txt} tramite {@link AiExtractionDebugRecorder}.</li>
- *   <li>Con {@code -Djpdfbookmarks.ai.debug=true} si aggiungono anche testo/PNG dettagliati come in passato.</li>
+ *       {@code payload_request_*.json}, {@code ocr_debug_*.txt}, per il cloud le PNG inviate a Supabase
+ *       ({@code debug_page_*_*_supabase.png} e affini) e {@code debug_supabase_response_*.json} tramite
+ *       {@link AiExtractionDebugRecorder}.</li>
+ *   <li>Con {@code -Djpdfbookmarks.ai.debug=true} si aggiungono anche altri artefatti testo/PNG per l'estrazione locale.</li>
  * </ul>
  */
 public class AiOrchestrator {
@@ -129,9 +131,23 @@ public class AiOrchestrator {
      */
     public ProcessIndexResult processIndex(PDDocument document, int startPage, int endPage)
             throws AiOrchestrationException {
+        return processIndex(document, startPage, endPage, null);
+    }
+
+    /**
+     * @param extendPaidTaskId opzionale (solo cloud): UUID task già pagato perrieseguire l'estrazione su più pagine
+     *                         indice senza nuovo pagamento.
+     */
+    public ProcessIndexResult processIndex(
+            PDDocument document, int startPage, int endPage, String extendPaidTaskId)
+            throws AiOrchestrationException {
         Objects.requireNonNull(document, "document");
         if (cloudClient != null) {
-            return processIndexViaCloud(document, startPage, endPage);
+            return processIndexViaCloud(document, startPage, endPage, extendPaidTaskId);
+        }
+        if (extendPaidTaskId != null && !extendPaidTaskId.isBlank()) {
+            throw new AiOrchestrationException(
+                    "L'estensione dell'indice dopo il pagamento è disponibile solo in modalità cloud.", null);
         }
         Objects.requireNonNull(extractorAgent, "extractorAgent");
 
@@ -211,7 +227,8 @@ public class AiOrchestrator {
         }
     }
 
-    private ProcessIndexResult processIndexViaCloud(PDDocument document, int startPage, int endPage)
+    private ProcessIndexResult processIndexViaCloud(
+            PDDocument document, int startPage, int endPage, String extendPaidTaskId)
             throws AiOrchestrationException {
         String indexPlainText = extractIndexPlainTextForAi(document, startPage, endPage);
         List<Image> images;
@@ -259,6 +276,8 @@ public class AiOrchestrator {
             throw new AiOrchestrationException(
                     "Impossibile unire le pagine indice in un'unica immagine per il servizio cloud.", e);
         }
+        AiExtractionDebugRecorder.tryWriteCloudIndexPngs(
+                debugRunId, startPage, endPage, singlePng, pngs.size() > 1 ? pngs : null);
         String model =
                 cloudProcessIndexModel != null && !cloudProcessIndexModel.isBlank()
                         ? cloudProcessIndexModel.trim().toLowerCase(Locale.ROOT)
@@ -268,9 +287,13 @@ public class AiOrchestrator {
         }
         String cloudJson =
                 cloudClient.buildProcessIndexJsonPayload(
-                        startPage, endPage, indexPlainText, singlePng, model);
+                        startPage, endPage, indexPlainText, singlePng, model, extendPaidTaskId);
         AiExtractionDebugRecorder.tryWriteExtractionDebug(debugRunId, cloudJson, indexPlainText);
-        return ProcessIndexResult.fromCloudProcessIndex(cloudClient.submitProcessIndexWithJson(cloudJson));
+        CloudIndexResult cloudResult = cloudClient.submitProcessIndexWithJson(cloudJson, debugRunId);
+        if (extendPaidTaskId != null && !extendPaidTaskId.isBlank()) {
+            return ProcessIndexResult.fromCloudPaidExtension(cloudResult);
+        }
+        return ProcessIndexResult.fromCloudProcessIndex(cloudResult);
     }
 
     /**

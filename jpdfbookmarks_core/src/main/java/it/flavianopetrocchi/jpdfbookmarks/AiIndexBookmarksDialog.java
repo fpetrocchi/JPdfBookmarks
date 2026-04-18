@@ -22,6 +22,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.text.MessageFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -129,6 +130,19 @@ public class AiIndexBookmarksDialog extends JDialog {
         north.add(intro);
         north.add(Box.createVerticalStrut(10));
         north.add(destNote);
+        if (orchestrator.usesCloudService()) {
+            north.add(Box.createVerticalStrut(10));
+            JLabel cloudNote =
+                    new JLabel(
+                            htmlWrap(
+                                    MessageFormat.format(
+                                            Res.getString("AI_INDEX_CLOUD_PREVIEW_NOTE"),
+                                            Prefs.CLOUD_FREE_PREVIEW_MAX_INDEX_PAGES),
+                                    480));
+            cloudNote.setAlignmentX(JLabel.LEFT_ALIGNMENT);
+            cloudNote.setFont(baseFont.deriveFont(Math.max(11f, baseFont.getSize2D() - 0.5f)));
+            north.add(cloudNote);
+        }
         content.add(north, BorderLayout.NORTH);
 
         int maxPage = Math.max(1, numPages);
@@ -397,6 +411,8 @@ public class AiIndexBookmarksDialog extends JDialog {
 
         int start = (Integer) spinnerStartPage.getValue();
         int end = (Integer) spinnerEndPage.getValue();
+        final int userChosenIndexStart = start;
+        final int userChosenIndexEnd = end;
         if (start > end) {
             JOptionPane.showMessageDialog(
                     jOptionPaneParent(),
@@ -406,6 +422,33 @@ public class AiIndexBookmarksDialog extends JDialog {
             return;
         }
 
+        if (orchestrator.usesCloudService()) {
+            int maxFree = Prefs.CLOUD_FREE_PREVIEW_MAX_INDEX_PAGES;
+            int span = end - start + 1;
+            if (span > maxFree) {
+                int newEnd = start + maxFree - 1;
+                int opt =
+                        JOptionPane.showConfirmDialog(
+                                jOptionPaneParent(),
+                                MessageFormat.format(
+                                        Res.getString("AI_INDEX_CLOUD_PAGE_LIMIT_CONFIRM"),
+                                        span,
+                                        maxFree,
+                                        start,
+                                        newEnd),
+                                Res.getString("AI_INDEX_DIALOG_TITLE"),
+                                JOptionPane.YES_NO_OPTION,
+                                JOptionPane.QUESTION_MESSAGE);
+                if (opt != JOptionPane.YES_OPTION) {
+                    return;
+                }
+                end = newEnd;
+                spinnerEndPage.setValue(end);
+            }
+        }
+
+        final int runStart = start;
+        final int runEnd = end;
         final int offset = (Integer) spinnerOffset.getValue();
 
         setFormEnabled(false);
@@ -416,7 +459,7 @@ public class AiIndexBookmarksDialog extends JDialog {
                 new SwingWorker<ProcessIndexResult, Void>() {
                     @Override
                     protected ProcessIndexResult doInBackground() throws Exception {
-                        return orchestrator.processIndex(document, start, end);
+                        return orchestrator.processIndex(document, runStart, runEnd);
                     }
 
                     @Override
@@ -445,7 +488,11 @@ public class AiIndexBookmarksDialog extends JDialog {
                                                 aiBookmarks ->
                                                         handleCloudBookmarksReady(aiBookmarks, offset),
                                                 pdfView,
-                                                offset)
+                                                offset,
+                                                document,
+                                                orchestrator,
+                                                userChosenIndexStart,
+                                                userChosenIndexEnd)
                                         .setVisible(true);
                                 return;
                             }

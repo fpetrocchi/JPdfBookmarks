@@ -161,7 +161,10 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 import javax.swing.undo.CannotUndoException;
 import javax.swing.undo.UndoableEdit;
-import javax.swing.undo.UndoableEditSupport;// </editor-fold>
+import javax.swing.undo.UndoableEditSupport;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignF;// </editor-fold>
 
 /**
  * The main frame of the JPdfBookmarks GUI.
@@ -325,6 +328,20 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
      * Optional: load {@code jpdfbookmarks.cjk.font.properties} from the classpath and replace {@link FontUIResource}
      * entries in {@link UIManager} defaults (CJK bookmark tree display).
      */
+    private static void registerFlatLafChoices() {
+        try {
+            Class.forName("com.formdev.flatlaf.FlatLightLaf");
+            UIManager.installLookAndFeel("Flat Light", "com.formdev.flatlaf.FlatLightLaf");
+            UIManager.installLookAndFeel("Flat Dark", "com.formdev.flatlaf.FlatDarkLaf");
+        } catch (ClassNotFoundException e) {
+            Logger.getLogger(JPdfBookmarksGui.class.getName())
+                    .log(Level.FINE, "FlatLaf not on classpath; skipping LAF registration.", e);
+        } catch (Exception e) {
+            Logger.getLogger(JPdfBookmarksGui.class.getName())
+                    .log(Level.FINE, "FlatLaf registration failed.", e);
+        }
+    }
+
     private static void initGlobalFont() {
         final String cjkProperties = "jpdfbookmarks.cjk.font.properties";
         String fontName = "Noto Serif CJK TC";
@@ -402,6 +419,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
      * JPdfBookmarksGui; viewer.initGui();
      */
     public void initGui() {
+        registerFlatLafChoices();
         //FIX BUG - GUI Bookmarks display CJK char being noto problem
         initGlobalFont();
 
@@ -798,6 +816,16 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         public ActionBuilder(String resName, String resDescription,
                 String accelerator, String resIcon, boolean enabled) {
+            this(resName, resDescription, accelerator, resIcon, null, enabled);
+        }
+
+        public ActionBuilder(String resName, String resDescription,
+                String accelerator, Ikon ikon, boolean enabled) {
+            this(resName, resDescription, accelerator, null, ikon, enabled);
+        }
+
+        private ActionBuilder(String resName, String resDescription,
+                String accelerator, String resIcon, Ikon ikon, boolean enabled) {
             super(Res.getString(resName));
             String description = null;
             if (resDescription != null) {
@@ -812,7 +840,10 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
                 putValue(Action.SHORT_DESCRIPTION, description);
             }
 
-            if (resIcon != null) {
+            if (ikon != null) {
+                putValue(Action.SMALL_ICON, UiIcons.of(ikon, 16));
+                putValue(Action.LARGE_ICON_KEY, UiIcons.of(ikon, 22));
+            } else if (resIcon != null) {
                 putValue(Action.SMALL_ICON, Res.getIcon(getClass(),
                         "gfx16/" + resIcon));
                 putValue(Action.LARGE_ICON_KEY, Res.getIcon(getClass(),
@@ -2017,7 +2048,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         // <editor-fold defaultstate="collapsed" desc="File Actions">
         openAction = new ActionBuilder("ACTION_OPEN", "ACTION_OPEN_DESCR",
-                platAcc("ctrl O"), "document-open.png", true) {
+                platAcc("ctrl O"), MaterialDesignF.FOLDER_OPEN, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2036,7 +2067,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         saveAction = new ActionBuilder("ACTION_SAVE", "ACTION_SAVE_DESCR",
-                platAcc("ctrl S"), "document-save.png", false) {
+                platAcc("ctrl S"), MaterialDesignC.CONTENT_SAVE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2314,7 +2345,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         goToPageAction = new ActionBuilder("ACTION_GO_PAGE",
-                "ACTION_GO_PAGE_DESCR", "ctrl alt INSERT", null, false) {
+                "ACTION_GO_PAGE_DESCR", "ctrl alt INSERT", (String) null, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2439,7 +2470,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };// </editor-fold>
 
         expandAllAction = new ActionBuilder("ACTION_EXPAND_ALL",
-                "ACTION_EXPAND_ALL_DESCR", "ctrl E", null, false) {
+                "ACTION_EXPAND_ALL_DESCR", "ctrl E", (String) null, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2448,7 +2479,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         collapseAllAction = new ActionBuilder("ACTION_COLLAPSE_ALL",
-                "ACTION_COLLAPSE_ALL_DESCR", "ctrl P", null, false) {
+                "ACTION_COLLAPSE_ALL_DESCR", "ctrl P", (String) null, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2458,7 +2489,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         optionsDialogAction = new ActionBuilder("ACTION_OPTIONS_DIALOG",
                 "ACTION_OPTIONS_DIALOG_DESCR", "ctrl alt O",
-                "preferences-system.png", true) {
+                MaterialDesignC.COG, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {

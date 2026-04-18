@@ -32,6 +32,14 @@ public final class ProcessIndexResult {
         return new ProcessIndexResult(cloud.bookmarks(), cloud.taskId(), null, true);
     }
 
+    /**
+     * Dopo {@code extend_paid_task_id}: stessa risposta cloud ma i segnalibri sono l'indice completo e non si riapre
+     * il flusso anteprima/pagamento.
+     */
+    public static ProcessIndexResult fromCloudPaidExtension(CloudIndexResult cloud) {
+        return new ProcessIndexResult(cloud.bookmarks(), cloud.taskId(), null, false);
+    }
+
     public List<AiBookmark> getBookmarks() {
         return bookmarks;
     }

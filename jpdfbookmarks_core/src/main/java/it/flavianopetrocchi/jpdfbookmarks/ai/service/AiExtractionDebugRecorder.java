@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -13,14 +14,19 @@ import java.util.regex.Pattern;
 
 /**
  * Salva in {@code ai_debug/} (sotto {@code user.dir}) artefatti per diagnosi di ogni tentativo di estrazione indice:
- * {@code payload_request_[timestamp].json} e {@code ocr_debug_[timestamp].txt}. I file non vengono mai cancellati
+ * {@code payload_request_[timestamp].json}, {@code ocr_debug_[timestamp].txt}, le PNG inviate a Supabase
+ * ({@code debug_page_*_[timestamp]_supabase.png}, affiancabili alle PNG di {@code -Djpdfbookmarks.ai.debug=true}) e, dopo la
+ * risposta HTTP {@code process-index}, {@code debug_supabase_response_[timestamp].json}. I file non vengono mai cancellati
  * automaticamente in caso di errore dell'estrazione.
  * <p>
  * Disattivazione: {@code -Djpdfbookmarks.ai.debug.persist=false}
  */
 public final class AiExtractionDebugRecorder {
 
-    /** Se {@code false}, non vengono scritti {@code payload_request_*} né {@code ocr_debug_*}. Default {@code true}. */
+    /**
+     * Se {@code false}, non vengono scritti {@code payload_request_*}, {@code ocr_debug_*}, PNG cloud né
+     * {@code debug_supabase_response_*}. Default {@code true}.
+     */
     public static final String SYSTEM_PROPERTY_DEBUG_PERSIST = "jpdfbookmarks.ai.debug.persist";
 
     private static final Logger LOG = Logger.getLogger(AiExtractionDebugRecorder.class.getName());
@@ -85,6 +91,155 @@ public final class AiExtractionDebugRecorder {
                             + ocrPath.getFileName());
         } catch (Exception e) {
             LOG.log(Level.WARNING, "JPdfBookmarks AI debug: could not write ai_debug extraction files", e);
+        }
+    }
+
+    /**
+     * Scrive il corpo JSON grezzo (o testo) della risposta Supabase {@code process-index}, con lo stesso suffisso
+     * temporale di {@link #tryWriteExtractionDebug}. Non propaga eccezioni.
+     *
+     * @param timestamp     stesso identificatore usato per {@code payload_request_*} (es. {@code yyyyMMdd_HHmmss})
+     * @param responseBody  corpo della risposta HTTP 2xx; tipicamente JSON
+     */
+    /**
+     * Salva la risposta grezza di {@code GET check-payment} quando il pagamento risulta confermato ma l'elenco
+     * segnalibri resta vuoto dopo il parsing (diagnosi contratto JSON / deserializzazione).
+     */
+    public static void tryWriteCheckPaymentDebug(String taskId, String responseBody) {
+        if (!isPersistenceEnabled()) {
+            return;
+        }
+        if (responseBody == null || responseBody.isBlank()) {
+            return;
+        }
+        try {
+            Path dir = debugDirectory();
+            Files.createDirectories(dir);
+            String safeId =
+                    (taskId != null ? taskId.trim().replaceAll("[^0-9A-Za-z._-]", "_") : "unknown")
+                            .replaceAll("^_+", "");
+            if (safeId.isBlank()) {
+                safeId = "unknown";
+            }
+            Path out = dir.resolve("debug_check_payment_" + safeId + ".json");
+            Files.writeString(out, prettifyJsonIfPossible(responseBody), StandardCharsets.UTF_8);
+            LOG.log(
+                    Level.INFO,
+                    "JPdfBookmarks AI debug: saved check-payment response under "
+                            + dir.toAbsolutePath().normalize()
+                            + " — "
+                            + out.getFileName());
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "JPdfBookmarks AI debug: could not write debug_check_payment file", e);
+        }
+    }
+
+    public static void tryWriteSupabaseResponseDebug(String timestamp, String responseBody) {
+        if (!isPersistenceEnabled()) {
+            return;
+        }
+        if (timestamp == null || timestamp.isBlank()) {
+            return;
+        }
+        if (responseBody == null) {
+            return;
+        }
+        try {
+            Path dir = debugDirectory();
+            Files.createDirectories(dir);
+            String safeTs = timestamp.trim().replaceAll("[^0-9A-Za-z._-]", "_");
+            Path out = dir.resolve("debug_supabase_response_" + safeTs + ".json");
+            String content = prettifyJsonIfPossible(responseBody);
+            Files.writeString(out, content, StandardCharsets.UTF_8);
+            LOG.log(
+                    Level.INFO,
+                    "JPdfBookmarks AI debug: saved Supabase process-index response under "
+                            + dir.toAbsolutePath().normalize()
+                            + " — "
+                            + out.getFileName());
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "JPdfBookmarks AI debug: could not write debug_supabase_response file", e);
+        }
+    }
+
+    /**
+     * Salva le PNG effettivamente usate per {@code imageBase64} verso Supabase (stesso {@code timestamp} degli altri
+     * file in {@code ai_debug/}). Convenzione nomi allineata a {@link AiOrchestrator} con
+     * {@code -Djpdfbookmarks.ai.debug=true}.
+     * <p>
+     * Se {@code perPagePngs} non è {@code null} e contiene più di un elemento, salva anche ogni pagina come
+     * {@code debug_page_<n>_<timestamp>_supabase_source.png} oltre all'immagine unita inviata
+     * ({@code debug_page_<from>-<to>_stacked_<timestamp>_supabase.png}).
+     */
+    public static void tryWriteCloudIndexPngs(
+            String timestamp,
+            int startPage,
+            int endPage,
+            byte[] pngSentToSupabase,
+            List<byte[]> perPagePngs) {
+        if (!isPersistenceEnabled()) {
+            return;
+        }
+        if (timestamp == null || timestamp.isBlank()) {
+            return;
+        }
+        if (pngSentToSupabase == null || pngSentToSupabase.length == 0) {
+            return;
+        }
+        try {
+            Path dir = debugDirectory();
+            Files.createDirectories(dir);
+            String safeTs = timestamp.trim().replaceAll("[^0-9A-Za-z._-]", "_");
+
+            if (perPagePngs != null && perPagePngs.size() > 1) {
+                for (int i = 0; i < perPagePngs.size(); i++) {
+                    byte[] slice = perPagePngs.get(i);
+                    if (slice == null || slice.length == 0) {
+                        continue;
+                    }
+                    int pageNum = startPage + i;
+                    Path p = dir.resolve("debug_page_" + pageNum + "_" + safeTs + "_supabase_source.png");
+                    Files.write(p, slice);
+                }
+                Path stacked =
+                        dir.resolve(
+                                "debug_page_"
+                                        + startPage
+                                        + "-"
+                                        + endPage
+                                        + "_stacked_"
+                                        + safeTs
+                                        + "_supabase.png");
+                Files.write(stacked, pngSentToSupabase);
+            } else if (endPage > startPage) {
+                Path p = dir.resolve("debug_page_" + startPage + "-" + endPage + "_" + safeTs + "_supabase.png");
+                Files.write(p, pngSentToSupabase);
+            } else {
+                Path p = dir.resolve("debug_page_" + startPage + "_" + safeTs + "_supabase.png");
+                Files.write(p, pngSentToSupabase);
+            }
+
+            LOG.log(
+                    Level.INFO,
+                    "JPdfBookmarks AI debug: saved cloud index PNG(s) under "
+                            + dir.toAbsolutePath().normalize()
+                            + " (run "
+                            + safeTs
+                            + ")");
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "JPdfBookmarks AI debug: could not write cloud index PNG files", e);
+        }
+    }
+
+    private static String prettifyJsonIfPossible(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "{}\n";
+        }
+        try {
+            JsonNode root = MAPPER.readTree(raw);
+            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+        } catch (Exception e) {
+            return raw;
         }
     }
 

@@ -25,9 +25,7 @@ public class AiOptionsPanel extends JPanel {
     @SuppressWarnings("unused")
     private static final String PROVIDER_OLLAMA = "OLLAMA";
 
-    private static final String[] OPENAI_MODEL_PRESETS = {
-        "gpt-5.4-mini", "gpt-5.4", "gpt-4o-mini", "gpt-4o"
-    };
+    private static final String[] OPENAI_MODEL_PRESETS = {Prefs.ALLOWED_OPENAI_MODEL_FOR_EXTRACTION};
 
     private final JRadioButton radioLocal = new JRadioButton(Res.getString("AI_OPTIONS_MODE_LOCAL"));
     private final JRadioButton radioCloud = new JRadioButton(Res.getString("AI_OPTIONS_MODE_CLOUD"));
@@ -95,7 +93,8 @@ public class AiOptionsPanel extends JPanel {
         c.fill = GridBagConstraints.BOTH;
         add(panelCloud, c);
 
-        comboOpenAiModel.setEditable(true);
+        comboOpenAiModel.setEditable(false);
+        comboOpenAiModel.setToolTipText(Res.getString("AI_OPTIONS_OPENAI_MODEL_MINI_ONLY"));
         radioLocal.setSelected(true);
         updateModeVisibility();
     }
@@ -285,6 +284,7 @@ public class AiOptionsPanel extends JPanel {
         if (prefs == null) {
             return;
         }
+        prefs.setAiExtractionModeExplicitlyChosen(true);
         if (radioCloud.isSelected()) {
             prefs.setAiExtractionMode(Prefs.AI_EXTRACTION_MODE_CLOUD);
         } else {

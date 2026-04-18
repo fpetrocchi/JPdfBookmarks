@@ -1,5 +1,5 @@
 = JPdfBookmarks
-life888888
+Flaviano Petrocchi; life888888 (Maven line)
 :doctype: article
 :encoding: utf-8
 :lang: zh
@@ -7,6 +7,13 @@ life888888
 :numbered:
 :experimental:
 
+== Project home and repository policy
+
+* *Canonical source repository (current development):* https://github.com/fpetrocchi/JPdfBookmarks[fpetrocchi/JPdfBookmarks on GitHub]
+* *Official Git mirror on SourceForge:* after Git is enabled on the project, use the clone URL shown there (pattern `https://git.code.sf.net/p/jpdfbookmarks/<repo-label>/`). It tracks the same history as GitHub; setup and push steps are in link:RELEASING.md[RELEASING.md] (sections *SourceForge Git mirror* and *SourceForge Files*).
+* *Historical project home and downloads:* https://sourceforge.net/projects/jpdfbookmarks/[jpdfbookmarks on SourceForge]
+* *Lineage:* This program is the same JPdfBookmarks originally developed in Subversion on SourceForge (GPL-3.0 since the 2010 open-source release). The Maven-based tree descends from SourceForge `branches/pdfbox` work (e.g. packaged as `jpdfbookmarks-code-r213-branches-pdfbox`) and incorporates the community fork https://github.com/life888888/JPdfBookmarks[life888888/JPdfBookmarks] (CJK GUI fixes, tooling). See link:AUTHORS[], link:THANKS[], link:CHANGELOG.md[], link:LICENSING.md[], and link:RELEASING.md[].
+* *License:* GNU General Public License v3.0 — full text in link:COPYING[]; summary in link:LICENSE[].
 
 * JPdfBookmarks v3.0.0 Maven is mirgrate from jpdfbookmarks-code-r213-branches-pdfbox.tar.gz (https://sourceforge.net/projects/jpdfbookmarks/)
 

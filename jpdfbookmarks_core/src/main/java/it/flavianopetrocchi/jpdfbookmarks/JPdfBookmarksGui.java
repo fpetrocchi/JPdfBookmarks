@@ -3267,6 +3267,9 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         aiToolbar = new JToolBar(Res.getString("TOOLBAR_AI"));
         mainToolbars.put(Prefs.SHOW_AI_TB, aiToolbar);
+        JLabel lblAiToolbar = new JLabel("AI:");
+        lblAiToolbar.setFocusable(false);
+        aiToolbar.add(lblAiToolbar);
         JButton btnAiIndex = aiToolbar.add(generateBookmarksFromIndexAiAction);
         btnAiIndex.setFocusable(false);
         if (btnAiIndex.getIcon() != null) {

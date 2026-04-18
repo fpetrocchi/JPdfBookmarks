@@ -13,15 +13,12 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Frame;
-import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.image.BufferedImage;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Objects;
@@ -31,8 +28,6 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -45,6 +40,7 @@ import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignP;
 
 /**
  * Dialogo per estrarre segnalibri da immagini dell'indice tramite IA (rendering + orchestrator).
@@ -291,7 +287,7 @@ public class AiIndexBookmarksDialog extends JDialog {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         row.setOpaque(false);
         row.add(spinner);
-        JButton b = new JButton(createCurrentPageIcon());
+        JButton b = new JButton(UiIcons.of(MaterialDesignP.PIN, 16));
         b.setMargin(new Insets(2, 4, 2, 4));
         b.setToolTipText(
                 forStart
@@ -306,25 +302,6 @@ public class AiIndexBookmarksDialog extends JDialog {
         }
         row.add(b);
         return row;
-    }
-
-    private static Icon createCurrentPageIcon() {
-        int s = 16;
-        BufferedImage img = new BufferedImage(s, s, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = img.createGraphics();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(new Color(52, 120, 180));
-            int pad = 2;
-            g.drawOval(pad, pad, s - 1 - 2 * pad, s - 1 - 2 * pad);
-            int cx = s / 2;
-            int cy = s / 2;
-            g.drawLine(cx, pad + 1, cx, s - pad - 2);
-            g.drawLine(pad + 1, cy, s - pad - 2, cy);
-        } finally {
-            g.dispose();
-        }
-        return new ImageIcon(img);
     }
 
     private void applyViewerPageToSpinner(JSpinner spinner) {

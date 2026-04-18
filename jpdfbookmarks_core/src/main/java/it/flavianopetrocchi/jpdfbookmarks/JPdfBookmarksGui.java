@@ -115,7 +115,6 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.CellEditor;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
@@ -163,8 +162,23 @@ import javax.swing.undo.CannotUndoException;
 import javax.swing.undo.UndoableEdit;
 import javax.swing.undo.UndoableEditSupport;
 import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignA;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignB;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
-import org.kordamp.ikonli.materialdesign2.MaterialDesignF;// </editor-fold>
+import org.kordamp.ikonli.materialdesign2.MaterialDesignE;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignF;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignG;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignH;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignL;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignM;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignN;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignO;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignP;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignR;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignS;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignT;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignU;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignW;// </editor-fold>
 
 /**
  * The main frame of the JPdfBookmarks GUI.
@@ -1998,7 +2012,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 //        pasteAction = TransferHandler.getPasteAction();
         extractLinks = new ActionBuilder(
                 "ACTION_EXTRACT_LINKS", "ACTION_EXTRACT_LINKS_DESCR",
-                null, "extract-links.png", false) {
+                null, MaterialDesignL.LINK_VARIANT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2007,7 +2021,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         cutAction = new ActionBuilder("ACTION_CUT", "ACTION_CUT_DESCR",
-                platAcc("ctrl X"), "edit-cut.png", false) {
+                platAcc("ctrl X"), MaterialDesignC.CONTENT_CUT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2016,7 +2030,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         copyAction = new ActionBuilder("ACTION_COPY", "ACTION_COPY_DESCR",
-                platAcc("ctrl C"), "edit-copy.png", false) {
+                platAcc("ctrl C"), MaterialDesignC.CONTENT_COPY, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2027,7 +2041,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         copyBookmarkFromViewAction = new ActionBuilder(
                 "ACTION_COPY_BOOKMARK_FROM_VIEW",
                 "ACTION_COPY_BOOKMARK_FROM_VIEW_DESCR", "ctrl shift C",
-                "copy-linked.png", false) {
+                MaterialDesignB.BOOKMARK_MULTIPLE_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2036,7 +2050,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         pasteAction = new ActionBuilder("ACTION_PASTE", "ACTION_PASTE_DESCR",
-                platAcc("ctrl V"), "edit-paste.png", false) {
+                platAcc("ctrl V"), MaterialDesignC.CONTENT_PASTE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2045,7 +2059,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         quitAction = new ActionBuilder("ACTION_QUIT", "ACTION_QUIT_DESCR",
-                "alt F4", "system-log-out.png", true) {
+                "alt F4", MaterialDesignL.LOGOUT, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2065,7 +2079,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         openLinkedPdf = new ActionBuilder(
                 "ACTION_OPEN_LINKED_PDF", "ACTION_OPEN_LINKED_PDF_DESCR",
-                platAcc("ctrl alt O"), "open-linked-pdf.png", false) {
+                platAcc("ctrl alt O"), MaterialDesignF.FILE_LINK, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2084,7 +2098,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         saveAsAction = new ActionBuilder("ACTION_SAVE_AS", "ACTION_SAVE_AS_DESCR",
-                platAcc("ctrl shift S"), "document-save-as.png", false) {
+                platAcc("ctrl shift S"), MaterialDesignC.CONTENT_SAVE_EDIT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2095,7 +2109,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         // Yes, on Windows the "close" keyboard accelerator is ctrl-F4; on macOS
         // it is cmd-W, necessitating this awful bit of code.
         closeAction = new ActionBuilder("ACTION_CLOSE", "ACTION_CLOSE_DESCR",
-                (!MACOS) ? "ctrl F4" : "meta W", "process-stop.png", false) {
+                (!MACOS) ? "ctrl F4" : "meta W", MaterialDesignW.WINDOW_CLOSE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2104,7 +2118,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         showOnOpenAction = new ActionBuilder("ACTION_SHOW_ON_OPEN",
-                "ACTION_SHOW_ON_OPEN_DESCR", null, "show-on-open.png", false) {
+                "ACTION_SHOW_ON_OPEN_DESCR", null, MaterialDesignE.EYE_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2120,7 +2134,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         dumpAction = new ActionBuilder(
                 "ACTION_DUMP", "ACTION_DUMP_DESCR",
-                (!MACOS) ? "ctrl alt D" : "meta D", "dump.png", false) {
+                (!MACOS) ? "ctrl alt D" : "meta D", MaterialDesignF.FILE_EXPORT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2130,7 +2144,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         loadAction = new ActionBuilder(
                 "ACTION_LOAD", "ACTION_LOAD_DESCR",
-                (!MACOS) ? "ctrl alt L" : "meta L", "load.png", false) {
+                (!MACOS) ? "ctrl alt L" : "meta L", MaterialDesignF.FILE_IMPORT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2140,7 +2154,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         // </editor-fold>
 
         undoAction = new ActionBuilder("ACTION_UNDO", "ACTION_UNDO_DESCR",
-                platAcc("ctrl Z"), "edit-undo.png", false) {
+                platAcc("ctrl Z"), MaterialDesignU.UNDO, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2152,7 +2166,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         // as it stands so as to not break compatibility with previous versions
         // - R M Fritz, 2020
         redoAction = new ActionBuilder("ACTION_REDO", "ACTION_REDO_DESCR",
-                platAcc("ctrl shift Z"), "edit-redo.png", false) {
+                platAcc("ctrl shift Z"), MaterialDesignR.REDO, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2162,7 +2176,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         addSiblingAction = new ActionBuilder("ACTION_ADD_SIBLING",
                 "ACTION_ADD_SIBLING_DESCR",
-                "ctrl alt S", "add-sibling.png", false) {
+                "ctrl alt S", MaterialDesignP.PLUS_BOX_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2171,7 +2185,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         addChildAction = new ActionBuilder("ACTION_ADD_CHILD",
-                "ACTION_ADD_CHILD_DESCR", "ctrl alt F", "add-child.png",
+                "ACTION_ADD_CHILD_DESCR", "ctrl alt F", MaterialDesignS.SUBDIRECTORY_ARROW_RIGHT,
                 false) {
 
             @Override
@@ -2181,7 +2195,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         addWebLinkAction = new ActionBuilder("ACTION_ADD_WEB_LINK",
-                "ACTION_ADD_WEB_LINK_DESCR", "ctrl alt W", "bookmark-web.png",
+                "ACTION_ADD_WEB_LINK_DESCR", "ctrl alt W", MaterialDesignW.WEB,
                 false) {
 
             @Override
@@ -2192,7 +2206,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         addLaunchLinkAction = new ActionBuilder("ACTION_ADD_LAUNCH_LINK",
                 "ACTION_ADD_LAUNCH_LINK_DESCR", "ctrl alt H",
-                "bookmark-launch.png", false) {
+                MaterialDesignO.OPEN_IN_NEW, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2201,7 +2215,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         deleteAction = new ActionBuilder("ACTION_DELETE", "ACTION_DELETE_DESCR",
-                "ctrl DELETE", "user-trash.png", false) {
+                "ctrl DELETE", MaterialDesignT.TRASH_CAN_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2211,7 +2225,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         setBoldAction = new ActionBuilder("ACTION_SET_BOLD",
                 "ACTION_SET_BOLD_DESCR",
-                "ctrl G", "format-text-bold.png", false) {
+                "ctrl G", MaterialDesignF.FORMAT_BOLD, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2222,7 +2236,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         setItalicAction = new ActionBuilder("ACTION_SET_ITALIC",
                 "ACTION_SET_ITALIC_DESCR",
-                "ctrl I", "format-text-italic.png", false) {
+                "ctrl I", MaterialDesignF.FORMAT_ITALIC, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2232,7 +2246,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         changeColorAction = new ActionBuilder("ACTION_CHANGE_COLOR",
-                "ACTION_CHANGE_COLOR_DESCR", null, "applications-graphics.png",
+                "ACTION_CHANGE_COLOR_DESCR", null, MaterialDesignP.PALETTE_OUTLINE,
                 false) {
 
             @Override
@@ -2242,7 +2256,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         renameAction = new ActionBuilder("ACTION_RENAME", "ACTION_RENAME_DESCR",
-                "ctrl F2", "edit-select-all.png", false) {
+                "ctrl F2", MaterialDesignS.SELECT_ALL, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2252,7 +2266,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         setDestFromViewAction = new ActionBuilder("ACTION_DEST_FROM_VIEW",
                 "ACTION_DEST_FROM_VIEW_DESCR", "ctrl alt A",
-                "dest-from-view.png", false) {
+                MaterialDesignC.CROSSHAIRS_GPS, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2261,7 +2275,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         applyPageOffset = new ActionBuilder("ACTION_PAGE_OFFSET",
-                "ACTION_PAGE_OFFSET_DESCR", null, "page-offset.png", false) {
+                "ACTION_PAGE_OFFSET_DESCR", null, MaterialDesignN.NUMERIC, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2271,7 +2285,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         generateBookmarksFromIndexAiAction =
                 new ActionBuilder("ACTION_AI_GENERATE", "ACTION_AI_GENERATE_DESCR", null,
-                        "ai-edit.png", false) {
+                        MaterialDesignR.ROBOT_OUTLINE, false) {
 
                     @Override
                     public void actionPerformed(ActionEvent e) {
@@ -2281,7 +2295,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         selectText = new ActionBuilder("ACTION_SELECT_TEXT",
                 "ACTION_SELECT_TEXT_DESCR",
-                "ctrl alt T", "select-text.png", false) {
+                "ctrl alt T", MaterialDesignF.FORMAT_TEXT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2297,7 +2311,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         connectToClipboard = new ActionBuilder("ACTION_CONNECT_CLIPBOARD",
                 "ACTION_CONNECT_CLIPBOARD_DESCR",
-                "ctrl alt C", "system-clip.png", false) {
+                "ctrl alt C", MaterialDesignC.CLIPBOARD_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2314,7 +2328,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         // <editor-fold defaultstate="collapsed" desc="Navigation Actions">
         goNextPageAction = new ActionBuilder("ACTION_GO_NEXT",
                 "ACTION_GO_NEXT_DESCR",
-                "ctrl alt RIGHT", "go-next.png", false) {
+                "ctrl alt RIGHT", MaterialDesignC.CHEVRON_RIGHT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2324,7 +2338,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         goFirstPageAction = new ActionBuilder("ACTION_GO_FIRST",
                 "ACTION_GO_FIRST_DESCR",
-                "ctrl alt HOME", "go-first.png", false) {
+                "ctrl alt HOME", MaterialDesignP.PAGE_FIRST, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2333,7 +2347,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         goLastPageAction = new ActionBuilder("ACTION_GO_LAST",
-                "ACTION_GO_LAST_DESCR", "ctrl alt END", "go-last.png", false) {
+                "ACTION_GO_LAST_DESCR", "ctrl alt END", MaterialDesignP.PAGE_LAST, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2343,7 +2357,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         goPreviousPageAction = new ActionBuilder("ACTION_GO_PREV",
                 "ACTION_GO_PREV_DESCR",
-                "ctrl alt LEFT", "go-previous.png", false) {
+                "ctrl alt LEFT", MaterialDesignC.CHEVRON_LEFT, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2352,7 +2366,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         goToPageAction = new ActionBuilder("ACTION_GO_PAGE",
-                "ACTION_GO_PAGE_DESCR", "ctrl alt INSERT", (String) null, false) {
+                "ACTION_GO_PAGE_DESCR", "ctrl alt INSERT", MaterialDesignF.FORMAT_LIST_NUMBERED, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2362,7 +2376,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         // <editor-fold defaultstate="collapsed" desc="Zoom Actions">
         fitRectAction = new ActionBuilder("ACTION_FIT_RECT",
-                "ACTION_FIT_RECT_DESCR", "ctrl R", "fit-rect.png",
+                "ACTION_FIT_RECT_DESCR", "ctrl R", MaterialDesignC.CROP,
                 false) {
 
             @Override
@@ -2377,7 +2391,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         fitWidthAction = new ActionBuilder("ACTION_FIT_WIDTH",
-                "ACTION_FIT_WIDTH_DESCR", "ctrl W", "fit-width.png",
+                "ACTION_FIT_WIDTH_DESCR", "ctrl W", MaterialDesignA.ARROW_EXPAND_HORIZONTAL,
                 false) {
 
             @Override
@@ -2393,7 +2407,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         fitHeightAction = new ActionBuilder("ACTION_FIT_HEIGHT",
-                "ACTION_FIT_HEIGHT_DESCR", "ctrl H", "fit-height.png",
+                "ACTION_FIT_HEIGHT_DESCR", "ctrl H", MaterialDesignA.ARROW_EXPAND_VERTICAL,
                 false) {
 
             @Override
@@ -2409,7 +2423,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         fitNativeAction = new ActionBuilder("ACTION_FIT_NATIVE",
-                "ACTION_FIT_NATIVE_DESCR", "ctrl N", "fit-native.png",
+                "ACTION_FIT_NATIVE_DESCR", "ctrl N", MaterialDesignN.NUMERIC_1_BOX_OUTLINE,
                 false) {
 
             @Override
@@ -2425,7 +2439,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         fitPageAction = new ActionBuilder("ACTION_FIT_PAGE",
-                "ACTION_FIT_PAGE_DESCR", "ctrl G", "fit-page.png",
+                "ACTION_FIT_PAGE_DESCR", "ctrl G", MaterialDesignF.FIT_TO_PAGE_OUTLINE,
                 false) {
 
             @Override
@@ -2441,7 +2455,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         topLeftZoomAction = new ActionBuilder("ACTION_TOP_LEFT_ZOOM",
-                "ACTION_TOP_LEFT_ZOOM_DESCR", null, "top-left-zoom.png",
+                "ACTION_TOP_LEFT_ZOOM_DESCR", null, MaterialDesignA.ARROW_TOP_LEFT,
                 false) {
 
             @Override
@@ -2457,7 +2471,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         zoomInAction = new ActionBuilder("ACTION_ZOOM_IN",
-                "ACTION_ZOOM_IN_DESCR", "alt +", "zoom-in.png", false) {
+                "ACTION_ZOOM_IN_DESCR", "alt +", MaterialDesignM.MAGNIFY_PLUS_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2467,7 +2481,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         zoomOutAction = new ActionBuilder("ACTION_ZOOM_OUT",
-                "ACTION_ZOOM_OUT_DESCR", "alt -", "zoom-out.png", false) {
+                "ACTION_ZOOM_OUT_DESCR", "alt -", MaterialDesignM.MAGNIFY_MINUS_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2477,7 +2491,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };// </editor-fold>
 
         expandAllAction = new ActionBuilder("ACTION_EXPAND_ALL",
-                "ACTION_EXPAND_ALL_DESCR", "ctrl E", (String) null, false) {
+                "ACTION_EXPAND_ALL_DESCR", "ctrl E", MaterialDesignU.UNFOLD_MORE_HORIZONTAL, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2486,7 +2500,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         collapseAllAction = new ActionBuilder("ACTION_COLLAPSE_ALL",
-                "ACTION_COLLAPSE_ALL_DESCR", "ctrl P", (String) null, false) {
+                "ACTION_COLLAPSE_ALL_DESCR", "ctrl P", MaterialDesignU.UNFOLD_LESS_HORIZONTAL, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2510,7 +2524,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         showActionsDialog = new ActionBuilder("ACTION_ACTIONS_DIALOG",
                 "ACTION_ACTIONS_DIALOG_DESCR", "ctrl alt N",
-                "actions-dialog.png", false) {
+                MaterialDesignT.TUNE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2524,7 +2538,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         checkUpdatesAction = new ActionBuilder("ACTION_CHECK_UPDATES",
                 "ACTION_CHECK_UPDATES_DESCR", null,
-                "system-software-update.png", true) {
+                MaterialDesignU.UPDATE, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2533,7 +2547,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         readOnlineManualAction = new ActionBuilder("ACTION_READ_MANUAL",
-                "ACTION_READ_MANUAL_DESCR", null, "help-browser.png", true) {
+                "ACTION_READ_MANUAL_DESCR", null, MaterialDesignH.HELP_CIRCLE_OUTLINE, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2542,7 +2556,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         donateToProject = new ActionBuilder("ACTION_DONATE",
-                "ACTION_DONATE_DESCR", null, "donate-icon.png", true) {
+                "ACTION_DONATE_DESCR", null, MaterialDesignG.GIFT_OUTLINE, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2552,7 +2566,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         goToAuthorBlog = new ActionBuilder("ACTION_GO_TO_BLOG",
                 "ACTION_GO_TO_BLOG_DESCR",
-                null, "internet-web-browser.png", true) {
+                null, MaterialDesignW.WEB, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -3487,9 +3501,9 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     private int dividerLocation;
 
     private void initComponents() {
-        UIManager.put("Tree.leafIcon", Res.getIcon(getClass(), "gfx16/bookmark.png"));
-        UIManager.put("Tree.openIcon", Res.getIcon(getClass(), "gfx16/bookmark.png"));
-        UIManager.put("Tree.closedIcon", Res.getIcon(getClass(), "gfx16/bookmarks.png"));
+        UIManager.put("Tree.leafIcon", UiIcons.of(MaterialDesignB.BOOKMARK_OUTLINE, 16));
+        UIManager.put("Tree.openIcon", UiIcons.of(MaterialDesignB.BOOKMARK, 16));
+        UIManager.put("Tree.closedIcon", UiIcons.of(MaterialDesignB.BOOKMARK_MULTIPLE_OUTLINE, 16));
 
         createActions();
 

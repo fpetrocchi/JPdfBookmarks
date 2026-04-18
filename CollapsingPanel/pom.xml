@@ -14,5 +14,13 @@
       <groupId>it.flavianopetrocchi.jpdfbookmarks</groupId>
       <artifactId>ResourceHelper</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.kordamp.ikonli</groupId>
+      <artifactId>ikonli-swing</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.kordamp.ikonli</groupId>
+      <artifactId>ikonli-materialdesign2-pack</artifactId>
+    </dependency>
   </dependencies>
 </project>

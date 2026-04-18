@@ -1,12 +1,13 @@
 package it.flavianopetrocchi.components.collapsingpanel;
 
 import it.flavianopetrocchi.reshelper.ResHelper;
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.BasicStroke;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Insets;
@@ -36,6 +37,9 @@ import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
+import org.kordamp.ikonli.swing.FontIcon;
 
 /**
  * Pannello laterale collassabile con strip verticale di icone per passare tra le schede interne (stile viewer PDF).
@@ -117,7 +121,7 @@ public class CollapsingPanel extends JPanel {
 
         openLeftPanelContainer.setBorder(BorderFactory.createEmptyBorder(5, 1, 0, 1));
         openLeftPanelContainer.setLayout(new BoxLayout(openLeftPanelContainer, BoxLayout.Y_AXIS));
-        JButton openPanelButton = new JButton(resHelper.getIcon("gfx16/open-panel.png"));
+        JButton openPanelButton = new JButton(stripIcon(MaterialDesignC.CHEVRON_DOUBLE_RIGHT, 18));
         openPanelButton.setToolTipText(resHelper.getString("OPEN_PANEL_BUTTON_DESCR"));
         openPanelButton.setContentAreaFilled(false);
         openPanelButton.setRolloverEnabled(true);
@@ -132,7 +136,7 @@ public class CollapsingPanel extends JPanel {
                 });
         openLeftPanelContainer.add(openPanelButton);
 
-        JButton closePanelButton = new JButton(resHelper.getIcon("gfx16/close-panel.png"));
+        JButton closePanelButton = new JButton(stripIcon(MaterialDesignC.CHEVRON_DOUBLE_LEFT, 18));
         closePanelButton.addMouseListener(new ButtonRolloverListener(closePanelButton));
         closePanelButton.setContentAreaFilled(false);
         closePanelButton.setToolTipText(resHelper.getString("CLOSE_PANEL_BUTTON_DESCR"));
@@ -158,6 +162,57 @@ public class CollapsingPanel extends JPanel {
         add(centerArea, BorderLayout.CENTER);
 
         containerSplitter.addContainerListener(new SplitterContainerListener(closePanelButton, openPanelButton));
+    }
+
+    private static Icon stripIcon(Ikon ikon, int sizePx) {
+        return new StripThemedFontIcon(ikon, sizePx);
+    }
+
+    /**
+     * Same behavior as {@code UiIcons} in the main app: LAF-aware and disabled-state-aware painting
+     * for toolbar-style strip controls.
+     */
+    private static final class StripThemedFontIcon implements Icon {
+
+        private final FontIcon delegate;
+
+        StripThemedFontIcon(Ikon ikon, int sizePx) {
+            delegate = FontIcon.of(ikon, sizePx);
+        }
+
+        private static Color resolveIconColor(Component c) {
+            boolean enabled = c == null || c.isEnabled();
+            if (!enabled) {
+                Color d = UIManager.getColor("Button.disabledForeground");
+                if (d != null) {
+                    return d;
+                }
+                d = UIManager.getColor("Label.disabledForeground");
+                return d != null ? d : new Color(0x80_80_80);
+            }
+            Color fg = UIManager.getColor("Button.foreground");
+            if (fg != null) {
+                return fg;
+            }
+            fg = UIManager.getColor("Label.foreground");
+            return fg != null ? fg : Color.BLACK;
+        }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            delegate.setIconColor(resolveIconColor(c));
+            delegate.paintIcon(c, g, x, y);
+        }
+
+        @Override
+        public int getIconWidth() {
+            return delegate.getIconWidth();
+        }
+
+        @Override
+        public int getIconHeight() {
+            return delegate.getIconHeight();
+        }
     }
 
     public void addPanelSelectionListener(Consumer<String> listener) {

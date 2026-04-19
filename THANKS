@@ -1,0 +1,18 @@
+JPdfBookmarks — acknowledgements
+
+The project owes thanks to everyone who reported bugs, suggested features,
+and contributed patches on SourceForge and GitHub.
+
+In particular:
+
+- Contributors on SourceForge Subversion (including work on the pdfbox branch and maintenance of the original Ant-based build).
+
+- life888888 — for publishing a Maven-based continuation of the SourceForge
+  code (including fixes for CJK characters in bookmark titles in GUI mode,
+  logging and font configuration, documentation, and links to native installer
+  build tooling). Upstream fork: https://github.com/life888888/JPdfBookmarks
+
+- Users who tested releases and filed feedback on forums and trackers.
+
+If you should be named here and are missing, please open an issue or send a
+patch to AUTHORS/THANKS.

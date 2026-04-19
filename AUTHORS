@@ -1,0 +1,24 @@
+JPdfBookmarks — authors and maintainers
+
+Original author and project founder
+----------------------------------
+Flaviano Petrocchi — created JPdfBookmarks; original Subversion tree and
+releases on SourceForge (user: fla1257).
+
+Current maintainer (canonical Git line)
+---------------------------------------
+Flaviano Petrocchi — canonical repository:
+https://github.com/fpetrocchi/JPdfBookmarks
+
+Notable upstream lines merged into this tree
+--------------------------------------------
+- SourceForge Subversion branches/pdfbox (e.g. revision 213) — migration
+  toward Apache PDFBox; tarball basis for the Mavenized line described in
+  README.adoc (jpdfbookmarks-code-r213-branches-pdfbox).
+
+- life888888 — GitHub fork that Mavenized the project, fixed CJK bookmark
+  display in the GUI, packaging and tooling improvements; see THANKS and
+  https://github.com/life888888/JPdfBookmarks
+
+For a fuller list of contributors over time, see Git history and past
+SourceForge commit logs.

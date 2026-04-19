@@ -26,6 +26,7 @@ import it.flavianopetrocchi.jpdfbookmarks.AiPreviewPaymentConfig;
 import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Chiamate GET verso Supabase per verificare il pagamento e scaricare i segnalibri finali, tramite {@link SupabaseAiClient}.
@@ -46,7 +47,8 @@ public final class CloudPaidBookmarksFetcher {
                         cfg.cloudProcessIndexUrl(),
                         cfg.supabaseAnonKey(),
                         cfg.cloudCheckPaymentUrl(),
-                        cfg.cloudFetchFullResultsUrl()));
+                        cfg.cloudFetchFullResultsUrl(),
+                        cfg.cloudStripePricesUrl()));
     }
 
     public boolean isPaid(String taskId) throws AiOrchestrationException {
@@ -60,5 +62,10 @@ public final class CloudPaidBookmarksFetcher {
 
     public List<AiBookmark> fetchFullBookmarks(String taskId) throws AiOrchestrationException {
         return client.fetchBookmarksForTask(taskId);
+    }
+
+    /** Vedi {@link SupabaseAiClient#tryFetchStripeCatalogPrices()}. */
+    public Optional<StripeCatalogPrices.Result> tryFetchStripeCatalogPrices() {
+        return client.tryFetchStripeCatalogPrices();
     }
 }

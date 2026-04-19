@@ -1,0 +1,12 @@
+---
+description: Local path to the pdfbookmarks-backend (Supabase Edge) repo for cloud IA
+alwaysApply: true
+---
+
+# pdfbookmarks-backend (Supabase / Edge Functions)
+
+Il backend companion per l’estrazione indice cloud, pagamenti Stripe, catalogo prezzi, ecc. **non** è in questo repository: il codice Supabase Edge / server vive qui:
+
+`C:\Users\flavi\Projects\pdfbookmarks-backend`
+
+Per implementare o correggere `process-index`, `check-payment`, endpoint JSON prezzi Stripe, webhook, segreti e deploy, usare quel progetto (aprirlo in workspace o riferire file lì), oltre a `JPdfBookmarks` dove sta solo il client Java.

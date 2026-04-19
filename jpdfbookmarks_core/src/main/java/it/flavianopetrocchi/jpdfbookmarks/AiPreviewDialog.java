@@ -3,7 +3,9 @@ package it.flavianopetrocchi.jpdfbookmarks;
 import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrationException;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiModelConverter;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.CloudPaidBookmarksFetcher;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.PdfPageLabelResolver;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.ProcessIndexResult;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.SupabaseAiClient;
 import java.awt.BorderLayout;
@@ -21,10 +23,13 @@ import java.awt.Insets;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.StripeCatalogPrices;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -84,11 +89,14 @@ public class AiPreviewDialog extends JDialog {
     private final PDDocument indexDocument;
 
     private final AiOrchestrator orchestratorForExtension;
+    private final PdfPageLabelResolver pageLabelResolver;
     private final int userFullIndexStart;
     private final int userFullIndexEnd;
     private final JTextArea statusArea = new JTextArea(2, 36);
     private final JLabel lblError = new JLabel(" ");
     private final AtomicBoolean pollingActive = new AtomicBoolean(false);
+    /** Etichetta prezzo Standard nella scheda non pagata; aggiornata in background se è configurato l'URL catalogo. */
+    private final AtomicReference<JLabel> liveStandardPriceLabelRef = new AtomicReference<>();
     private Timer pollTimer;
     private volatile PollKind pollKind = PollKind.NONE;
 
@@ -180,6 +188,7 @@ public class AiPreviewDialog extends JDialog {
         this.pageNumberOffset = pageNumberOffset;
         this.indexDocument = indexDocument;
         this.orchestratorForExtension = orchestratorForExtension;
+        this.pageLabelResolver = PdfPageLabelResolver.create(indexDocument);
         this.userFullIndexStart = userFullIndexStart;
         this.userFullIndexEnd = userFullIndexEnd;
         this.fetcher = CloudPaidBookmarksFetcher.fromAiPreviewPaymentConfig(paymentConfig);
@@ -198,7 +207,8 @@ public class AiPreviewDialog extends JDialog {
             lblError.setText(Res.getString("AI_PREVIEW_MISSING_TASK_ID"));
         }
 
-        DefaultMutableTreeNode root = buildPreviewTree(previewBookmarks, pageNumberOffset);
+        DefaultMutableTreeNode root =
+                buildPreviewTree(previewBookmarks, pageNumberOffset, PREVIEW_VISIBLE_FRACTION, pageLabelResolver);
         previewTreeModel = new DefaultTreeModel(root);
         previewTree = new JTree(previewTreeModel);
         previewTree.setRootVisible(true);
@@ -329,6 +339,7 @@ public class AiPreviewDialog extends JDialog {
                                     : (c.getMessage() != null ? c.getMessage() : ex.toString());
                     statusArea.setText(msg);
                     dynamicPaymentArea.removeAll();
+                    liveStandardPriceLabelRef.set(null);
                     populateUnpaidPaymentLayout();
                     dynamicPaymentArea.revalidate();
                     dynamicPaymentArea.repaint();
@@ -340,6 +351,7 @@ public class AiPreviewDialog extends JDialog {
 
     private void applyInitialCheckResult(SupabaseAiClient.CheckPaymentResult r) {
         dynamicPaymentArea.removeAll();
+        liveStandardPriceLabelRef.set(null);
         if (r.paid() && !r.bookmarksWhenPaid().isEmpty()) {
             statusArea.setText(Res.getString("AI_PREVIEW_ALREADY_PAID_STATUS"));
             showPaidFullDownloadPanel(r.bookmarksWhenPaid());
@@ -356,16 +368,108 @@ public class AiPreviewDialog extends JDialog {
     }
 
     private void populateUnpaidPaymentLayout() {
+        liveStandardPriceLabelRef.set(null);
         dynamicPaymentArea.add(buildPaymentCard(paymentConfig.cloudStripeCheckoutMiniUrl()));
+        scheduleStripePriceRefreshIfConfigured();
+    }
+
+    private void scheduleStripePriceRefreshIfConfigured() {
+        if (paymentConfig.cloudStripePricesUrl() == null || paymentConfig.cloudStripePricesUrl().isBlank()) {
+            return;
+        }
+        final JLabel target = liveStandardPriceLabelRef.get();
+        if (target == null) {
+            return;
+        }
+        new SwingWorker<Optional<StripeCatalogPrices.Result>, Void>() {
+            @Override
+            protected Optional<StripeCatalogPrices.Result> doInBackground() {
+                return fetcher.tryFetchStripeCatalogPrices();
+            }
+
+            @Override
+            protected void done() {
+                if (!isDisplayable()) {
+                    return;
+                }
+                JLabel lab = liveStandardPriceLabelRef.get();
+                if (lab == null || lab != target) {
+                    return;
+                }
+                try {
+                    Optional<StripeCatalogPrices.Result> opt = get();
+                    opt.flatMap(r -> Optional.ofNullable(r.standard()))
+                            .ifPresent(
+                                    tier -> {
+                                        String s = StripeCatalogPrices.format(tier);
+                                        if (!s.isBlank()) {
+                                            lab.setText(s);
+                                        }
+                                    });
+                } catch (Exception ignored) {
+                }
+            }
+        }.execute();
     }
 
     private void showPaidFullDownloadPanel(List<AiBookmark> bookmarks) {
+        if (needsFullPaidReextract()) {
+            replaceTreeWithFullBookmarks(bookmarks);
+            statusArea.setText(Res.getString("AI_PREVIEW_REEXTRACT_FULL_INDEX_STATUS"));
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            new SwingWorker<ProcessIndexResult, Void>() {
+                @Override
+                protected ProcessIndexResult doInBackground() throws Exception {
+                    return orchestratorForExtension.processIndex(
+                            indexDocument, userFullIndexStart, userFullIndexEnd, taskId);
+                }
+
+                @Override
+                protected void done() {
+                    setCursor(Cursor.getDefaultCursor());
+                    if (!isDisplayable()) {
+                        return;
+                    }
+                    try {
+                        ProcessIndexResult r = get();
+                        List<AiBookmark> bm = r.getBookmarks();
+                        if (bm != null && !bm.isEmpty()) {
+                            paidPanelAfterBookmarksResolved(bm);
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                    AiPreviewDialog.this,
+                                    Res.getString("AI_PREVIEW_REEXTRACT_FAILED"),
+                                    Res.getString("AI_PREVIEW_WINDOW_TITLE"),
+                                    JOptionPane.WARNING_MESSAGE);
+                            paidPanelAfterBookmarksResolved(bookmarks);
+                        }
+                    } catch (Exception ex) {
+                        Throwable c = ex.getCause() != null ? ex.getCause() : ex;
+                        String msg =
+                                c instanceof AiOrchestrationException
+                                        ? c.getMessage()
+                                        : (c.getMessage() != null ? c.getMessage() : ex.toString());
+                        JOptionPane.showMessageDialog(
+                                AiPreviewDialog.this,
+                                msg + "\n\n" + Res.getString("AI_PREVIEW_REEXTRACT_FAILED"),
+                                Res.getString("AI_INDEX_ERROR_TITLE"),
+                                JOptionPane.ERROR_MESSAGE);
+                        paidPanelAfterBookmarksResolved(bookmarks);
+                    }
+                }
+            }.execute();
+            return;
+        }
+        paidPanelAfterBookmarksResolved(bookmarks);
+    }
+
+    private void paidPanelAfterBookmarksResolved(List<AiBookmark> bookmarks) {
         replaceTreeWithFullBookmarks(bookmarks);
         dynamicPaymentArea.add(new JLabel(htmlWrap(Res.getString("AI_PREVIEW_ALREADY_PAID_DOWNLOAD_HINT"), 420)));
         dynamicPaymentArea.add(Box.createVerticalStrut(10));
         JButton download = new JButton(Res.getString("AI_PREVIEW_BTN_DOWNLOAD_PURCHASED"));
         styleGreenButton(download);
-        download.addActionListener(e -> finishWithBookmarks(bookmarks));
+        download.addActionListener(e -> finishWithBookmarksAndClose(bookmarks));
         alignFullWidth(download);
         dynamicPaymentArea.add(download);
     }
@@ -403,10 +507,10 @@ public class AiPreviewDialog extends JDialog {
     }
 
     private void addFullBookmarkNodes(DefaultMutableTreeNode parent, AiBookmark b) {
-        Integer p = bookmarkPageOrNull(b, pageNumberOffset);
+        Integer p = bookmarkPageOrNull(b, pageNumberOffset, pageLabelResolver);
         DefaultMutableTreeNode n =
                 new DefaultMutableTreeNode(
-                        new PreviewNode(formatVisibleBookmark(b, pageNumberOffset), p, true));
+                        new PreviewNode(formatVisibleBookmark(b, pageNumberOffset, pageLabelResolver), p, true));
         parent.add(n);
         for (AiBookmark c : b.getChildrenView()) {
             addFullBookmarkNodes(n, c);
@@ -442,6 +546,7 @@ public class AiPreviewDialog extends JDialog {
         Font pf = priceLab.getFont();
         priceLab.setFont(pf.deriveFont(Font.BOLD, pf.getSize2D() + 4f));
         card.add(priceLab, c);
+        liveStandardPriceLabelRef.set(priceLab);
         c.gridy = 3;
         c.insets = new Insets(12, 0, 0, 0);
         JButton pay = new JButton(Res.getString("AI_PREVIEW_BTN_STANDARD"));
@@ -682,15 +787,19 @@ public class AiPreviewDialog extends JDialog {
         onPaidBookmarksReady.accept(list);
     }
 
-    private static DefaultMutableTreeNode buildPreviewTree(List<AiBookmark> roots, int pageNumberOffset) {
+    private static DefaultMutableTreeNode buildPreviewTree(
+            List<AiBookmark> roots,
+            int pageNumberOffset,
+            double preorderVisibleFraction,
+            PdfPageLabelResolver pageLabelResolver) {
         int total = countPreorderBookmarks(roots);
-        int visibleLimit = previewVisibleLimit(total);
+        int visibleLimit = previewVisibleLimit(total, preorderVisibleFraction);
         DefaultMutableTreeNode top =
                 new DefaultMutableTreeNode(new PreviewNode(Res.getString("AI_PREVIEW_TREE_ROOT"), null, false));
         int[] preorder = {0};
         if (roots != null) {
             for (AiBookmark b : roots) {
-                addPreorder(top, b, preorder, visibleLimit, pageNumberOffset);
+                addPreorder(top, b, preorder, visibleLimit, pageNumberOffset, pageLabelResolver);
             }
         }
         return top;
@@ -701,19 +810,20 @@ public class AiPreviewDialog extends JDialog {
             AiBookmark b,
             int[] preorder,
             int visibleLimit,
-            int pageNumberOffset) {
+            int pageNumberOffset,
+            PdfPageLabelResolver pageLabelResolver) {
         preorder[0]++;
         int idx = preorder[0];
         boolean unlocked = idx <= visibleLimit;
         String display =
                 unlocked
-                        ? formatVisibleBookmark(b, pageNumberOffset)
+                        ? formatVisibleBookmark(b, pageNumberOffset, pageLabelResolver)
                         : Res.getString("AI_PREVIEW_LOCKED_NODE");
-        Integer page = unlocked ? bookmarkPageOrNull(b, pageNumberOffset) : null;
+        Integer page = unlocked ? bookmarkPageOrNull(b, pageNumberOffset, pageLabelResolver) : null;
         DefaultMutableTreeNode n = new DefaultMutableTreeNode(new PreviewNode(display, page, unlocked));
         parent.add(n);
         for (AiBookmark c : b.getChildrenView()) {
-            addPreorder(n, c, preorder, visibleLimit, pageNumberOffset);
+            addPreorder(n, c, preorder, visibleLimit, pageNumberOffset, pageLabelResolver);
         }
     }
 
@@ -735,11 +845,12 @@ public class AiPreviewDialog extends JDialog {
         }
     }
 
-    private static int previewVisibleLimit(int totalBookmarkNodes) {
+    private static int previewVisibleLimit(int totalBookmarkNodes, double fraction) {
         if (totalBookmarkNodes <= 0) {
             return 0;
         }
-        int v = (int) Math.ceil(totalBookmarkNodes * PREVIEW_VISIBLE_FRACTION);
+        double f = fraction > 0 && fraction <= 1.0 ? fraction : PREVIEW_VISIBLE_FRACTION;
+        int v = (int) Math.ceil(totalBookmarkNodes * f);
         return Math.min(totalBookmarkNodes, Math.max(1, v));
     }
 
@@ -747,22 +858,20 @@ public class AiPreviewDialog extends JDialog {
      * Pagina effettiva per anteprima/navigazione: come {@link it.flavianopetrocchi.jpdfbookmarks.ai.service.AiModelConverter},
      * somma {@code pageNumberOffset} solo se il numero restituito dall'IA è {@code >= 1}.
      */
-    private static Integer bookmarkPageOrNull(AiBookmark b, int pageNumberOffset) {
-        Integer p = b.getPageNumber();
-        if (p == null || p < 1) {
-            return null;
-        }
-        return p + pageNumberOffset;
+    private static Integer bookmarkPageOrNull(
+            AiBookmark b, int pageNumberOffset, PdfPageLabelResolver pageLabelResolver) {
+        return AiModelConverter.resolveTargetPageNumber(b, pageNumberOffset, pageLabelResolver);
     }
 
-    private static String formatVisibleBookmark(AiBookmark b, int pageNumberOffset) {
+    private static String formatVisibleBookmark(
+            AiBookmark b, int pageNumberOffset, PdfPageLabelResolver pageLabelResolver) {
         String t = b.getTitle() != null ? b.getTitle() : "";
-        Integer p = b.getPageNumber();
-        if (p != null) {
-            if (p > 0) {
-                return t + " [" + (p + pageNumberOffset) + "]";
-            }
-            return t + " [" + p + "]";
+        PdfPageLabelResolver resolver =
+                pageLabelResolver != null ? pageLabelResolver : PdfPageLabelResolver.unavailable();
+        PdfPageLabelResolver.Resolution r = resolver.resolve(b, pageNumberOffset);
+        String display = r.displayLabel();
+        if (display != null && !display.isBlank()) {
+            return t + " [" + display + "]";
         }
         return t;
     }

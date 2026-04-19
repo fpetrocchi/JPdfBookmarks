@@ -45,6 +45,7 @@ final class AiCloudBundledDefaults {
     private final String fetchFullUrl;
     private final String stripeCheckoutMiniUrl;
     private final String stripeCheckoutAdvancedUrl;
+    private final String stripePricesUrl;
 
     private AiCloudBundledDefaults(
             String processIndexUrl,
@@ -52,13 +53,15 @@ final class AiCloudBundledDefaults {
             String checkPaymentUrl,
             String fetchFullUrl,
             String stripeCheckoutMiniUrl,
-            String stripeCheckoutAdvancedUrl) {
+            String stripeCheckoutAdvancedUrl,
+            String stripePricesUrl) {
         this.processIndexUrl = processIndexUrl;
         this.anonKey = anonKey;
         this.checkPaymentUrl = checkPaymentUrl;
         this.fetchFullUrl = fetchFullUrl;
         this.stripeCheckoutMiniUrl = stripeCheckoutMiniUrl;
         this.stripeCheckoutAdvancedUrl = stripeCheckoutAdvancedUrl;
+        this.stripePricesUrl = stripePricesUrl;
     }
 
     static AiCloudBundledDefaults get() {
@@ -93,6 +96,10 @@ final class AiCloudBundledDefaults {
         return stripeCheckoutAdvancedUrl;
     }
 
+    String stripePricesUrl() {
+        return stripePricesUrl;
+    }
+
     private static AiCloudBundledDefaults load() {
         Properties p = new Properties();
         try (InputStream in =
@@ -109,7 +116,8 @@ final class AiCloudBundledDefaults {
                 trimOrEmpty(p.getProperty("ai.cloud.check.payment.url")),
                 trimOrEmpty(p.getProperty("ai.cloud.fetch.full.url")),
                 trimOrEmpty(p.getProperty("ai.cloud.stripe.checkout.mini.url")),
-                trimOrEmpty(p.getProperty("ai.cloud.stripe.checkout.advanced.url")));
+                trimOrEmpty(p.getProperty("ai.cloud.stripe.checkout.advanced.url")),
+                trimOrEmpty(p.getProperty("ai.cloud.stripe.prices.url")));
     }
 
     private static String trimOrEmpty(String s) {

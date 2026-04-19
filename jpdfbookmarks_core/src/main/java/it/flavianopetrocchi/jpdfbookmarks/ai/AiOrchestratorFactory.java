@@ -100,7 +100,8 @@ public final class AiOrchestratorFactory {
                             prefs.getCloudProcessIndexUrl().trim(),
                             prefs.getCloudSupabaseAnonKey().trim(),
                             prefs.getCloudCheckPaymentUrl(),
-                            prefs.getCloudFetchFullResultsUrl());
+                            prefs.getCloudFetchFullResultsUrl(),
+                            prefs.getCloudStripePricesUrl());
             PdfVisionService vision = new PdfVisionService(OPENAI_INDEX_RENDER_DPI);
             return new AiOrchestrator(vision, null, false, cloud, prefs.getCloudProcessIndexModel());
         }

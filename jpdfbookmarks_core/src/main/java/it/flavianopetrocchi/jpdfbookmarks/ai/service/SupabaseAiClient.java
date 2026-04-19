@@ -42,6 +42,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * HTTP client for Supabase Edge (or compatible) endpoints: submit index images, optional payment check, fetch bookmarks.
@@ -50,6 +53,8 @@ import java.util.Objects;
  * {@code bookmarks} (array); il risultato è un {@link CloudIndexResult}.
  */
 public final class SupabaseAiClient {
+
+    private static final Logger LOG = Logger.getLogger(SupabaseAiClient.class.getName());
 
     /**
      * Risposta {@code GET check-payment}: {@code paid}, {@code model_type} quando noto, e segnalibri se inclusi
@@ -70,6 +75,8 @@ public final class SupabaseAiClient {
     private final String anonKey;
     private final String checkPaymentUrl;
     private final String fetchBookmarksUrl;
+    /** GET pubblico (stessi header Supabase) che restituisce JSON catalogo prezzi; vedi {@link StripeCatalogPrices}. */
+    private final String stripePricesUrl;
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(45)).build();
 
@@ -97,10 +104,37 @@ public final class SupabaseAiClient {
             String anonKey,
             String checkPaymentUrl,
             String fetchBookmarksUrl) {
+        this(processIndexUrl, anonKey, checkPaymentUrl, fetchBookmarksUrl, "");
+    }
+
+    public SupabaseAiClient(
+            String processIndexUrl,
+            String anonKey,
+            String checkPaymentUrl,
+            String fetchBookmarksUrl,
+            String stripePricesUrl) {
         this.processIndexUrl = Objects.requireNonNull(processIndexUrl, "processIndexUrl").trim();
         this.anonKey = normalizeSupabasePublicAnonKey(Objects.requireNonNull(anonKey, "anonKey"));
         this.checkPaymentUrl = checkPaymentUrl != null ? checkPaymentUrl.trim() : "";
         this.fetchBookmarksUrl = fetchBookmarksUrl != null ? fetchBookmarksUrl.trim() : "";
+        this.stripePricesUrl = stripePricesUrl != null ? stripePricesUrl.trim() : "";
+    }
+
+    /**
+     * GET opzionale verso {@code stripePricesUrl}: importi correnti (vedi {@link StripeCatalogPrices}). Non propaga
+     * eccezioni; su URL vuoto, chiave anon assente, errore HTTP o JSON non valido restituisce {@link Optional#empty()}.
+     */
+    public Optional<StripeCatalogPrices.Result> tryFetchStripeCatalogPrices() {
+        if (stripePricesUrl.isEmpty() || anonKey.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            String body = httpGet(stripePricesUrl);
+            return StripeCatalogPrices.parse(body);
+        } catch (Exception e) {
+            LOG.log(Level.FINE, "Optional stripe catalog prices request failed", e);
+            return Optional.empty();
+        }
     }
 
     /**
@@ -467,6 +501,7 @@ public final class SupabaseAiClient {
             AiBookmark b = new AiBookmark();
             b.setTitle(readBookmarkTitle(el));
             b.setPageNumber(readBookmarkPageNumber(el));
+            b.setPageLabelRaw(readBookmarkPageLabelRaw(el));
             JsonNode ch = el.get("children");
             if (ch == null || !ch.isArray()) {
                 ch = el.get("items");
@@ -546,6 +581,26 @@ public final class SupabaseAiClient {
             }
         }
         return null;
+    }
+
+    private static String readBookmarkPageLabelRaw(JsonNode o) {
+        JsonNode p = o.get("page_label_raw");
+        if (p == null) {
+            p = o.get("pageLabelRaw");
+        }
+        if (p == null) {
+            p = o.get("page_label");
+        }
+        if (p == null) {
+            p = o.get("pageLabel");
+        }
+        if (p == null || p.isNull()) {
+            return "";
+        }
+        if (p.isTextual()) {
+            return p.asText();
+        }
+        return String.valueOf(p);
     }
 
     private static JsonNode readTree(String body) throws AiOrchestrationException {

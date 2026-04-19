@@ -4,6 +4,7 @@ import it.flavianopetrocchi.jpdfbookmarks.ai.model.AiBookmark;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiModelConverter;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrationException;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
+import it.flavianopetrocchi.jpdfbookmarks.ai.service.PdfPageLabelResolver;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.ProcessIndexResult;
 import it.flavianopetrocchi.jpdfbookmarks.bookmark.Bookmark;
 import java.awt.BorderLayout;
@@ -65,6 +66,7 @@ public class AiIndexBookmarksDialog extends JDialog {
     private final AiOrchestrator orchestrator;
     private final BiConsumer<List<Bookmark>, Boolean> bookmarkApplicator;
     private final Prefs userPrefs;
+    private final PdfPageLabelResolver pageLabelResolver;
 
     private final IPdfView pdfView;
     private final Consumer<AiIndexDialogMemory> onEndStoreValues;
@@ -103,6 +105,7 @@ public class AiIndexBookmarksDialog extends JDialog {
         this.orchestrator = Objects.requireNonNull(orchestrator, "orchestrator");
         this.bookmarkApplicator = Objects.requireNonNull(bookmarkApplicator, "bookmarkApplicator");
         this.userPrefs = Objects.requireNonNull(prefs, "prefs");
+        this.pageLabelResolver = PdfPageLabelResolver.create(document);
         this.pdfView = pdfView;
         this.onEndStoreValues = onEndStoreValues;
 
@@ -474,7 +477,8 @@ public class AiIndexBookmarksDialog extends JDialog {
                                 return;
                             }
                             List<AiBookmark> result = indexResult.getBookmarks();
-                            List<Bookmark> converted = AiModelConverter.toAppBookmarks(result, offset);
+                            List<Bookmark> converted =
+                                    AiModelConverter.toAppBookmarks(result, offset, pageLabelResolver);
                             if (converted.isEmpty()) {
                                 JOptionPane.showMessageDialog(
                                         jOptionPaneParent(),
@@ -521,7 +525,7 @@ public class AiIndexBookmarksDialog extends JDialog {
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        List<Bookmark> converted = AiModelConverter.toAppBookmarks(aiBookmarks, offset);
+        List<Bookmark> converted = AiModelConverter.toAppBookmarks(aiBookmarks, offset, pageLabelResolver);
         if (converted.isEmpty()) {
             JOptionPane.showMessageDialog(
                     jOptionPaneParent(),

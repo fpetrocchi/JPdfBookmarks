@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>it.flavianopetrocchi.jpdfbookmarks</groupId>
   <artifactId>jpdfbookmarks</artifactId>
-  <version>3.0.2-SNAPSHOT</version>
+  <version>3.1.0</version>
   <packaging>pom</packaging>
   <name>jpdfbookmarks</name>
   <url>http://sourceforge.net/projects/jpdfbookmarks/</url>
@@ -25,6 +25,7 @@
     <ai.cloud.fetch.full.url></ai.cloud.fetch.full.url>
     <ai.cloud.stripe.checkout.mini.url></ai.cloud.stripe.checkout.mini.url>
     <ai.cloud.stripe.checkout.advanced.url></ai.cloud.stripe.checkout.advanced.url>
+    <ai.cloud.stripe.prices.url></ai.cloud.stripe.prices.url>
   </properties>
   <licenses>
     <license>

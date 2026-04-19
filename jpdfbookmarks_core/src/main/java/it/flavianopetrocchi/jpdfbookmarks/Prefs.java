@@ -91,6 +91,7 @@ public class Prefs {
     private final String AI_CLOUD_FETCH_FULL_RESULTS_URL = "AI_CLOUD_FETCH_FULL_RESULTS_URL";
     private final String AI_CLOUD_STRIPE_CHECKOUT_MINI_URL = "AI_CLOUD_STRIPE_CHECKOUT_MINI_URL";
     private final String AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL = "AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL";
+    private final String AI_CLOUD_STRIPE_PRICES_URL = "AI_CLOUD_STRIPE_PRICES_URL";
     private final String AI_CLOUD_PROCESS_INDEX_MODEL = "AI_CLOUD_PROCESS_INDEX_MODEL";
 
     /** Valore {@code model} inviato a process-index (tier estrazione). */
@@ -558,6 +559,50 @@ public class Prefs {
 
     public void setCloudStripeCheckoutAdvancedUrl(String value) {
         userPrefs.put(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, value != null ? value.trim() : "");
+    }
+
+    /**
+     * URL GET (stessi header Supabase dell'anon key) che restituisce JSON prezzi Standard/Advanced; vedi
+     * {@link it.flavianopetrocchi.jpdfbookmarks.ai.service.StripeCatalogPrices}. Ordine: preferenza utente, default
+     * Maven ({@code ai-cloud-defaults.properties}), altrimenti stesso host di {@link #getCloudCheckPaymentUrl()} con
+     * path {@code …/functions/v1/stripe-catalog-prices}. Se ancora vuoto si usano solo le stringhe fisse nei bundle lingua.
+     */
+    public String getCloudStripePricesUrl() {
+        String v = userPrefs.get(AI_CLOUD_STRIPE_PRICES_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        String bundled = AiCloudBundledDefaults.get().stripePricesUrl();
+        if (bundled != null && !bundled.trim().isEmpty()) {
+            return bundled.trim();
+        }
+        return deriveStripeCatalogPricesUrlFromCheckPayment(getCloudCheckPaymentUrl());
+    }
+
+    /**
+     * Se {@code checkPaymentUrl} punta a {@code …/functions/v1/check-payment}, restituisce la URL gemella per
+     * {@code stripe-catalog-prices}; altrimenti stringa vuota.
+     */
+    static String deriveStripeCatalogPricesUrlFromCheckPayment(String checkPaymentUrl) {
+        if (checkPaymentUrl == null) {
+            return "";
+        }
+        String u = checkPaymentUrl.trim();
+        if (u.isEmpty()) {
+            return "";
+        }
+        int q = u.indexOf('?');
+        if (q >= 0) {
+            u = u.substring(0, q);
+        }
+        if (!u.endsWith("check-payment")) {
+            return "";
+        }
+        return u.substring(0, u.length() - "check-payment".length()) + "stripe-catalog-prices";
+    }
+
+    public void setCloudStripePricesUrl(String value) {
+        userPrefs.put(AI_CLOUD_STRIPE_PRICES_URL, value != null ? value.trim() : "");
     }
 
     /**

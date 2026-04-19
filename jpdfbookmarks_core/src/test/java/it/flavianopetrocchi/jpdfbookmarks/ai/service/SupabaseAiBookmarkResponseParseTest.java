@@ -36,11 +36,12 @@ class SupabaseAiBookmarkResponseParseTest {
     @Test
     void parsesNestedChildrenWithAliasPageField() throws Exception {
         String json =
-                "{\"bookmarks\":[{\"title\":\"P\",\"page\":\"3\",\"children\":[{\"title\":\"C\",\"page_number\":2}]}]}";
+                "{\"bookmarks\":[{\"title\":\"P\",\"page\":\"3\",\"page_label_raw\":\"iii\",\"children\":[{\"title\":\"C\",\"page_number\":2}]}]}";
         List<AiBookmark> list = SupabaseAiClient.parseBookmarksFromResponseNode(MAPPER.readTree(json));
         assertNotNull(list);
         assertEquals(1, list.size());
         assertEquals(3, list.get(0).getPageNumber());
+        assertEquals("iii", list.get(0).getPageLabelRaw());
         assertEquals(1, list.get(0).getChildrenView().size());
         assertEquals("C", list.get(0).getChildrenView().get(0).getTitle());
     }

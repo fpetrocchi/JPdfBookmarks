@@ -48,17 +48,21 @@ public interface BookmarkExtractorAgent {
                     + "- Se il testo digitale e l'immagine dicono cose diverse sui numeri, fidati del testo digitale.\n"
                     + "- Se una voce nell'immagine è chiaramente rientrata rispetto a quella sopra, mettila in \"children\" "
                     + "del nodo padre nel JSON.\n"
-                    + "- Estrai i numeri di pagina esattamente come scritti (l'offset verrà applicato dal codice Java dopo).\n"
-                    + "- Non inventare numeri; se una voce non ha numero, usa \"page_number\": -1.\n"
+                    + "- Se una voce ha un riferimento pagina, salva SEMPRE il testo esatto in \"page_label_raw\" (es. "
+                    + "\"xii\", \"A-12\", \"40\").\n"
+                    + "- Metti \"page_number\" solo se il riferimento è chiaramente un intero arabo; altrimenti usa "
+                    + "\"page_number\": -1.\n"
                     + "- Con più immagini o pagine in sequenza, un solo indice continuo; non duplicare voci già chiuse sopra.\n"
                     + "- Titoli nella lingua originale del documento.\n"
                     + "\n"
                     + "Restituisci SOLO il JSON: un array (primo carattere '[', ultimo ']') di oggetti con \"title\", "
-                    + "\"page_number\", \"children\" (array vuoto se foglia). Nessun markdown, nessun testo fuori dal JSON.")
+                    + "\"page_number\", \"page_label_raw\", \"children\" (array vuoto se foglia). Nessun markdown, "
+                    + "nessun testo fuori dal JSON.")
     @UserMessage(
             "Testo digitale (text layer) estratto dalle stesse pagine (può essere vuoto o imperfetto):\n---\n"
                     + "{{textLayerContent}}\n---\n"
-                    + "Immagini delle pagine d'indice in ordine. Solo l'array JSON (title, page_number, children), nient'altro.")
+                    + "Immagini delle pagine d'indice in ordine. Solo l'array JSON (title, page_number, page_label_raw, "
+                    + "children), nient'altro.")
     String extractBookmarks(
             @V("textLayerContent") String textLayerContent, @UserMessage List<ImageContent> pages);
 }

@@ -57,6 +57,14 @@ public class AiBookmark {
     private Integer pageNumber;
 
     /**
+     * Page label/reference as printed in the index (for example {@code xii}, {@code A-12}, {@code 40}).
+     * Useful when the PDF logical numbering uses page labels instead of a constant offset.
+     */
+    @JsonProperty("page_label_raw")
+    @JsonAlias({"pageLabelRaw", "page_label", "pageLabel", "page_ref", "pageRef"})
+    private String pageLabelRaw;
+
+    /**
      * Depth in the tree (0 = root level). Optional hint for models that emit a flat level field.
      */
     @JsonProperty("level")
@@ -100,6 +108,14 @@ public class AiBookmark {
 
     public void setPageNumber(Integer pageNumber) {
         this.pageNumber = pageNumber;
+    }
+
+    public String getPageLabelRaw() {
+        return pageLabelRaw;
+    }
+
+    public void setPageLabelRaw(String pageLabelRaw) {
+        this.pageLabelRaw = pageLabelRaw;
     }
 
     public Integer getLevel() {

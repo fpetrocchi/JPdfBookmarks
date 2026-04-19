@@ -49,13 +49,24 @@ public final class AiModelConverter {
      * @return mutable list of native bookmarks (empty if input is null or empty)
      */
     public static List<Bookmark> toAppBookmarks(List<AiBookmark> aiBookmarks, int offset) {
+        return toAppBookmarks(aiBookmarks, offset, PdfPageLabelResolver.unavailable());
+    }
+
+    /**
+     * Converts each top-level {@link AiBookmark} into a root {@link Bookmark}, resolving PDF logical page labels when
+     * possible and falling back to the historical constant offset strategy otherwise.
+     */
+    public static List<Bookmark> toAppBookmarks(
+            List<AiBookmark> aiBookmarks, int offset, PdfPageLabelResolver pageLabelResolver) {
         if (aiBookmarks == null || aiBookmarks.isEmpty()) {
             return new ArrayList<>();
         }
+        PdfPageLabelResolver resolver =
+                pageLabelResolver != null ? pageLabelResolver : PdfPageLabelResolver.unavailable();
         List<Bookmark> roots = new ArrayList<>(aiBookmarks.size());
         for (AiBookmark ai : aiBookmarks) {
             if (ai != null) {
-                roots.add(toAppBookmark(ai, offset));
+                roots.add(toAppBookmark(ai, offset, resolver));
             }
         }
         return roots;
@@ -67,7 +78,7 @@ public final class AiModelConverter {
      * @param ai radice non null dell'albero da convertire
      */
     public static Bookmark toAppBookmark(AiBookmark ai) {
-        return toAppBookmark(ai, 0);
+        return toAppBookmark(ai, 0, PdfPageLabelResolver.unavailable());
     }
 
     /**
@@ -78,28 +89,44 @@ public final class AiModelConverter {
      * @param offset intero sommato ai soli {@code page_number} positivi (correzione applicata lato applicazione)
      */
     public static Bookmark toAppBookmark(AiBookmark ai, int offset) {
+        return toAppBookmark(ai, offset, PdfPageLabelResolver.unavailable());
+    }
+
+    /**
+     * Converts one {@link AiBookmark} subtree into a {@link Bookmark}, preferring explicit PDF page labels and using the
+     * offset only as fallback.
+     */
+    public static Bookmark toAppBookmark(AiBookmark ai, int offset, PdfPageLabelResolver pageLabelResolver) {
         Objects.requireNonNull(ai, "ai");
+        PdfPageLabelResolver resolver =
+                pageLabelResolver != null ? pageLabelResolver : PdfPageLabelResolver.unavailable();
         Bookmark node = new Bookmark();
         String title = ai.getTitle();
         if (title != null && !title.isEmpty()) {
             node.setTitle(title);
         }
         Integer pageNumber = ai.getPageNumber();
-        if (pageNumber != null) {
-            if (pageNumber > 0) {
-                node.setPageNumber(pageNumber + offset);
-            } else {
-                node.setPageNumber(pageNumber);
-            }
+        Integer resolvedPageNumber = resolveTargetPageNumber(ai, offset, resolver);
+        if (resolvedPageNumber != null) {
+            node.setPageNumber(resolvedPageNumber);
+        } else if (pageNumber != null) {
+            node.setPageNumber(pageNumber);
         }
         List<AiBookmark> children = ai.getChildren();
         if (children != null) {
             for (AiBookmark child : children) {
                 if (child != null) {
-                    node.add(toAppBookmark(child, offset));
+                    node.add(toAppBookmark(child, offset, resolver));
                 }
             }
         }
         return node;
+    }
+
+    public static Integer resolveTargetPageNumber(AiBookmark ai, int offset, PdfPageLabelResolver pageLabelResolver) {
+        Objects.requireNonNull(ai, "ai");
+        PdfPageLabelResolver resolver =
+                pageLabelResolver != null ? pageLabelResolver : PdfPageLabelResolver.unavailable();
+        return resolver.resolve(ai, offset).physicalPageNumber();
     }
 }

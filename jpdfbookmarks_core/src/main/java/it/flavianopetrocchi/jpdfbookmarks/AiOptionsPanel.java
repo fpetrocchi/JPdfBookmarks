@@ -39,6 +39,7 @@ public class AiOptionsPanel extends JPanel {
     private final JTextField fieldCloudCheckUrl = new JTextField(32);
     private final JTextField fieldCloudFetchFullUrl = new JTextField(32);
     private final JTextField fieldCloudStripeMiniUrl = new JTextField(32);
+    private final JTextField fieldCloudStripePricesUrl = new JTextField(32);
 
     private final JPanel panelOpenAi;
     private final JPanel panelOllama;
@@ -232,6 +233,23 @@ public class AiOptionsPanel extends JPanel {
         c.fill = GridBagConstraints.HORIZONTAL;
         p.add(fieldCloudStripeMiniUrl, c);
 
+        c.gridx = 0;
+        c.gridy = 6;
+        c.gridwidth = 2;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        p.add(new JLabel(htmlWrap(Res.getString("AI_OPTIONS_CLOUD_STRIPE_PRICES_HINT"), 520)), c);
+
+        c.gridy = 7;
+        c.gridwidth = 1;
+        c.weightx = 0;
+        c.fill = GridBagConstraints.NONE;
+        p.add(new JLabel(Res.getString("AI_OPTIONS_CLOUD_STRIPE_PRICES_URL")), c);
+        c.gridx = 1;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        p.add(fieldCloudStripePricesUrl, c);
+
         return p;
     }
 
@@ -277,6 +295,7 @@ public class AiOptionsPanel extends JPanel {
         fieldCloudCheckUrl.setText(prefs.getCloudCheckPaymentUrl());
         fieldCloudFetchFullUrl.setText(prefs.getCloudFetchFullResultsUrl());
         fieldCloudStripeMiniUrl.setText(prefs.getCloudStripeCheckoutMiniUrl());
+        fieldCloudStripePricesUrl.setText(prefs.getCloudStripePricesUrl());
         updateModeVisibility();
     }
 
@@ -302,6 +321,7 @@ public class AiOptionsPanel extends JPanel {
         prefs.setCloudCheckPaymentUrl(fieldCloudCheckUrl.getText().trim());
         prefs.setCloudFetchFullResultsUrl(fieldCloudFetchFullUrl.getText().trim());
         prefs.setCloudStripeCheckoutMiniUrl(fieldCloudStripeMiniUrl.getText().trim());
+        prefs.setCloudStripePricesUrl(fieldCloudStripePricesUrl.getText().trim());
         if (radioCloud.isSelected()) {
             prefs.setCloudProcessIndexModel(Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD);
         }

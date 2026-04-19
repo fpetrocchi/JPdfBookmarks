@@ -11,6 +11,7 @@ public record AiPreviewPaymentConfig(
         String cloudFetchFullResultsUrl,
         String cloudStripeCheckoutMiniUrl,
         String cloudStripeCheckoutAdvancedUrl,
+        String cloudStripePricesUrl,
         String cloudProcessIndexUrl) {
 
     public static AiPreviewPaymentConfig fromPrefs(Prefs prefs) {
@@ -21,6 +22,7 @@ public record AiPreviewPaymentConfig(
                 prefs.getCloudFetchFullResultsUrl().trim(),
                 prefs.getCloudStripeCheckoutMiniUrl().trim(),
                 prefs.getCloudStripeCheckoutAdvancedUrl().trim(),
+                prefs.getCloudStripePricesUrl().trim(),
                 prefs.getCloudProcessIndexUrl().trim());
     }
 }

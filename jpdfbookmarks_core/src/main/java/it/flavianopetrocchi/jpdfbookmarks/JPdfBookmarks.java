@@ -107,7 +107,7 @@ class JPdfBookmarks {
 //            "http://jpdfbookmarks.altervista.org/version/lastVersion";
     public static final String LAST_VERSION_PROPERTIES_URL =
             "http://jpdfbookmarks.altervista.org/version/jpdfbookmarks.properties";
-    public static final String MANUAL_URL = "http://sourceforge.net/apps/mediawiki/jpdfbookmarks/";
+    public static final String DISCUSSION_URL = "https://sourceforge.net/p/jpdfbookmarks/discussion/";
     public static final boolean MACOS = System.getProperty("os.name").contains("OS X");
     private static final int MAX_PASSWORD_LEN = 32;
     //"http://jpdfbookmarks.altervista.org";

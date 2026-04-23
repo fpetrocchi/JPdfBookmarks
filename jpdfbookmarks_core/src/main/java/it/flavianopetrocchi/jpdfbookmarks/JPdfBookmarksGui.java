@@ -169,7 +169,6 @@ import org.kordamp.ikonli.materialdesign2.MaterialDesignD;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignE;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignF;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignG;
-import org.kordamp.ikonli.materialdesign2.MaterialDesignH;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignL;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignM;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignN;
@@ -192,6 +191,8 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         RenderingStartListener, TextCopiedListener, TreeNodeMovedListener {
 
     // <editor-fold defaultstate="collapsed" desc="Members">
+    static final String DONATE_URL
+            = "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=flavianopetrocchi%40gmail.com&item_name=Support+JPdfBookmarks&currency_code=EUR&amount=5.90";
     public static final boolean MACOS
             = System.getProperty("os.name").contains("OS X");
     private static final Clipboard localClipboard;
@@ -479,9 +480,12 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
             @Override
             public void windowOpened(WindowEvent e) {
-                if (userPrefs.getCheckUpdatesOnStart()) {
-                    checkUpdates(true);
-                }
+                SwingUtilities.invokeLater(() -> {
+                    showAboutBox();
+                    if (userPrefs.getCheckUpdatesOnStart()) {
+                        checkUpdates(true);
+                    }
+                });
             }
         };
 
@@ -530,6 +534,8 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
             return;
         }
 
+        showAboutBox();
+
         try {
             fileOperator.close();
         } catch (Exception ex) {
@@ -544,6 +550,12 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         } else {
             dispose();
         }
+    }
+
+    private void showAboutBox() {
+        AboutBox aboutBox = new AboutBox(this, true);
+        aboutBox.setLocationRelativeTo(this);
+        aboutBox.setVisible(true);
     }
 
     @Override
@@ -1287,6 +1299,20 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     }
 
     private void goToWebLink(String uri) {
+        goToWebLink(uri, true);
+    }
+
+    private void goToWebLink(String uri, boolean askConfirmation) {
+
+        if (askConfirmation && userPrefs.getNeverAskWebAccess() == false) {
+            int answer = JOptionPane.showConfirmDialog(this,
+                    Res.getString("MSG_LAUNCH_BROWSER"), title,
+                    JOptionPane.OK_CANCEL_OPTION);
+
+            if (answer != JOptionPane.OK_OPTION) {
+                return;
+            }
+        }
 
         Desktop desktop = Desktop.getDesktop();
         try {
@@ -2548,11 +2574,11 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         readOnlineManualAction = new ActionBuilder("ACTION_READ_MANUAL",
-                "ACTION_READ_MANUAL_DESCR", null, MaterialDesignH.HELP_CIRCLE_OUTLINE, true) {
+                "ACTION_READ_MANUAL_DESCR", null, MaterialDesignF.FORUM, true) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                goToWebLink(JPdfBookmarks.MANUAL_URL);
+                goToWebLink(JPdfBookmarks.DISCUSSION_URL);
             }
         };
 
@@ -2561,7 +2587,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                goToWebLink("http://sourceforge.net/donate/index.php?group_id=297580");
+                goToWebLink(DONATE_URL, false);
             }
         };
 
@@ -3027,9 +3053,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
             item = new JMenuItem(Res.getString("MENU_ABOUT_BOX") + " ...");
             item.setMnemonic(Res.mnemonicFromRes("MENU_ABOUT_BOX_MNEMONIC"));
             item.addActionListener((ActionEvent e) -> {
-                AboutBox aboutBox = new AboutBox(JPdfBookmarksGui.this, true);
-                aboutBox.setLocationRelativeTo(JPdfBookmarksGui.this);
-                aboutBox.setVisible(true);
+                showAboutBox();
             });
             menuHelp.add(item);
         }

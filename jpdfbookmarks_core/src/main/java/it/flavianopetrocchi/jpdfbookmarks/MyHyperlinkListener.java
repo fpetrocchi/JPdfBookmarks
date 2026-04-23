@@ -62,12 +62,18 @@ public class MyHyperlinkListener implements HyperlinkListener {
      * @param uri
      */
     public void goToWebLink(String uri) {
-        int answer = JOptionPane.showConfirmDialog(parent,
-                Res.getString("MSG_LAUNCH_BROWSER"), JPdfBookmarks.APP_NAME,
-                JOptionPane.OK_CANCEL_OPTION);
+        goToWebLink(uri, true);
+    }
 
-        if (answer != JOptionPane.OK_OPTION) {
-            return;
+    public void goToWebLink(String uri, boolean askConfirmation) {
+        if (askConfirmation) {
+            int answer = JOptionPane.showConfirmDialog(parent,
+                    Res.getString("MSG_LAUNCH_BROWSER"), JPdfBookmarks.APP_NAME,
+                    JOptionPane.OK_CANCEL_OPTION);
+
+            if (answer != JOptionPane.OK_OPTION) {
+                return;
+            }
         }
 
         Desktop desktop = Desktop.getDesktop();

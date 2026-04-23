@@ -64,6 +64,17 @@ public class AboutBox extends javax.swing.JDialog {
         txtMail.setCursor(handCursor);
         txtHomepage.setCursor(handCursor);
         txtBlog.setCursor(handCursor);
+        btnDonate.setText("Dona a JPdfBookmarks");
+        btnDonate.setToolTipText(Res.getString("ACTION_DONATE_DESCR"));
+        btnDonate.setBackground(new Color(255, 196, 0));
+        btnDonate.setForeground(Color.BLACK);
+        btnDonate.setFocusPainted(false);
+        btnDonate.setOpaque(true);
+        btnDonate.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        btnDonate.setPreferredSize(new java.awt.Dimension(250, 42));
+        btnDonate.setMargin(new java.awt.Insets(10, 18, 10, 18));
+        btnDonate.setFont(btnDonate.getFont().deriveFont(java.awt.Font.BOLD,
+                btnDonate.getFont().getSize2D() + 3f));
         btnClose.requestFocusInWindow();
         // Turn on the hyperlink listener
         linksListener = new MyHyperlinkListener(this);
@@ -99,6 +110,7 @@ public class AboutBox extends javax.swing.JDialog {
         javax.swing.JLabel appVendorLabel1 = new javax.swing.JLabel();
         leftPanel = new javax.swing.JPanel();
         progIconLabel = new javax.swing.JLabel();
+        btnDonate = new javax.swing.JButton();
         btnClose = new javax.swing.JButton();
         gplv3Label = new javax.swing.JLabel();
 
@@ -220,6 +232,13 @@ public class AboutBox extends javax.swing.JDialog {
 
         appVendorLabel1.setText("GNU General Public License Version 3"); // NOI18N
 
+        btnDonate.setText("Dona a JPdfBookmarks");
+        btnDonate.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnDonateActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout rightPanelLayout = new javax.swing.GroupLayout(rightPanel);
         rightPanel.setLayout(rightPanelLayout);
         rightPanelLayout.setHorizontalGroup(
@@ -236,6 +255,10 @@ public class AboutBox extends javax.swing.JDialog {
                 .addContainerGap()
                 .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 575, Short.MAX_VALUE)
                 .addContainerGap())
+            .addGroup(rightPanelLayout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(btnDonate, javax.swing.GroupLayout.PREFERRED_SIZE, 259, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
             .addGroup(rightPanelLayout.createSequentialGroup()
                 .addGroup(rightPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(rightPanelLayout.createSequentialGroup()
@@ -270,7 +293,9 @@ public class AboutBox extends javax.swing.JDialog {
                 .addComponent(appTitleLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(appDescLabel)
-                .addGap(18, 18, 18)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(btnDonate, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(rightPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(versionLabel)
                     .addComponent(appVersionLabel))
@@ -363,6 +388,11 @@ public class AboutBox extends javax.swing.JDialog {
         // TODO add your handling code here:
         setVisible(false);
     }//GEN-LAST:event_btnCloseActionPerformed
+
+    private void btnDonateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDonateActionPerformed
+        linksListener.goToWebLink(JPdfBookmarksGui.DONATE_URL, false);
+        setVisible(false);
+    }//GEN-LAST:event_btnDonateActionPerformed
 
 	private void txtMailActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtMailActionPerformed
             mail(txtMail.getText().trim());
@@ -494,6 +524,7 @@ public class AboutBox extends javax.swing.JDialog {
         });
     }
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton btnDonate;
     private javax.swing.JButton btnClose;
     private javax.swing.JLabel gplv3Label;
     private javax.swing.JScrollPane jScrollPane1;

@@ -165,6 +165,7 @@ import org.kordamp.ikonli.Ikon;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignA;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignB;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignD;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignE;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignF;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignG;
@@ -2118,7 +2119,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         showOnOpenAction = new ActionBuilder("ACTION_SHOW_ON_OPEN",
-                "ACTION_SHOW_ON_OPEN_DESCR", null, MaterialDesignE.EYE_OUTLINE, false) {
+                "ACTION_SHOW_ON_OPEN_DESCR", null, MaterialDesignF.FILE_TREE_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2134,7 +2135,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         dumpAction = new ActionBuilder(
                 "ACTION_DUMP", "ACTION_DUMP_DESCR",
-                (!MACOS) ? "ctrl alt D" : "meta D", MaterialDesignF.FILE_EXPORT, false) {
+                (!MACOS) ? "ctrl alt D" : "meta D", MaterialDesignF.FILE_DOWNLOAD_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2144,7 +2145,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
         loadAction = new ActionBuilder(
                 "ACTION_LOAD", "ACTION_LOAD_DESCR",
-                (!MACOS) ? "ctrl alt L" : "meta L", MaterialDesignF.FILE_IMPORT, false) {
+                (!MACOS) ? "ctrl alt L" : "meta L", MaterialDesignF.FILE_UPLOAD_OUTLINE, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -2275,7 +2276,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         };
 
         applyPageOffset = new ActionBuilder("ACTION_PAGE_OFFSET",
-                "ACTION_PAGE_OFFSET_DESCR", null, MaterialDesignN.NUMERIC, false) {
+                "ACTION_PAGE_OFFSET_DESCR", null, MaterialDesignD.DELTA, false) {
 
             @Override
             public void actionPerformed(ActionEvent e) {

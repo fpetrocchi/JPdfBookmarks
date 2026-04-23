@@ -7,6 +7,7 @@ import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.PdfPageLabelResolver;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.ProcessIndexResult;
 import it.flavianopetrocchi.jpdfbookmarks.bookmark.Bookmark;
+import java.awt.Desktop;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -20,8 +21,18 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.MessageFormat;
+import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiConsumer;
@@ -30,6 +41,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -425,6 +437,9 @@ public class AiIndexBookmarksDialog extends JDialog {
                 end = newEnd;
                 spinnerEndPage.setValue(end);
             }
+            if (!confirmCloudUploadConsent()) {
+                return;
+            }
         }
 
         final int runStart = start;
@@ -560,6 +575,113 @@ public class AiIndexBookmarksDialog extends JDialog {
         }
         boolean replace = (choice == MERGE_OPTION_REPLACE);
         bookmarkApplicator.accept(bookmarks, replace);
+    }
+
+    private boolean confirmCloudUploadConsent() {
+        if (userPrefs.getNeverAskCloudUploadConsent()) {
+            return true;
+        }
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        JLabel message = new JLabel(htmlWrap(Res.getString("AI_INDEX_CLOUD_CONSENT_MESSAGE"), 430));
+        message.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JCheckBox rememberChoice =
+                new JCheckBox(Res.getString("AI_INDEX_CLOUD_CONSENT_REMEMBER"));
+        rememberChoice.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(message);
+        String privacyUrl = buildCloudPrivacyNoticeUrl();
+        if (!privacyUrl.isEmpty()) {
+            panel.add(Box.createVerticalStrut(10));
+            JButton privacyButton =
+                    new JButton(Res.getString("AI_INDEX_CLOUD_CONSENT_PRIVACY_BUTTON"));
+            privacyButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+            privacyButton.addActionListener(e -> downloadPrivacyNoticeAndOpenInBrowser(privacyUrl));
+            panel.add(privacyButton);
+        }
+        panel.add(Box.createVerticalStrut(12));
+        panel.add(rememberChoice);
+
+        String continueOption = Res.getString("AI_INDEX_CLOUD_CONSENT_CONTINUE");
+        String cancelOption = Res.getString("CANCEL");
+        Object[] options = {continueOption, cancelOption};
+        int choice =
+                JOptionPane.showOptionDialog(
+                        jOptionPaneParent(),
+                        panel,
+                        Res.getString("AI_INDEX_DIALOG_TITLE"),
+                        JOptionPane.DEFAULT_OPTION,
+                        JOptionPane.WARNING_MESSAGE,
+                        null,
+                        options,
+                        cancelOption);
+        if (choice != 0) {
+            return false;
+        }
+        if (rememberChoice.isSelected()) {
+            userPrefs.setNeverAskCloudUploadConsent(true);
+        }
+        return true;
+    }
+
+    private String buildCloudPrivacyNoticeUrl() {
+        String base = userPrefs.getCloudPrivacyNoticeUrl();
+        if (base == null || base.isBlank()) {
+            return "";
+        }
+        String lang = Locale.getDefault().getLanguage();
+        String normalized = "it".equalsIgnoreCase(lang) ? "it" : "en";
+        String sep = base.contains("?") ? "&" : "?";
+        return base + sep + "lang=" + normalized;
+    }
+
+    private void downloadPrivacyNoticeAndOpenInBrowser(String privacyUrl) {
+        if (privacyUrl == null || privacyUrl.isBlank()) {
+            return;
+        }
+        if (!userPrefs.getNeverAskWebAccess()) {
+            int answer =
+                    JOptionPane.showConfirmDialog(
+                            jOptionPaneParent(),
+                            Res.getString("MSG_LAUNCH_BROWSER"),
+                            Res.getString("AI_INDEX_DIALOG_TITLE"),
+                            JOptionPane.OK_CANCEL_OPTION);
+            if (answer != JOptionPane.OK_OPTION) {
+                return;
+            }
+        }
+        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            JOptionPane.showMessageDialog(
+                    jOptionPaneParent(),
+                    Res.getString("ERROR_LAUNCHING_BROWSER") + " " + privacyUrl,
+                    Res.getString("AI_INDEX_DIALOG_TITLE"),
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        try {
+            HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
+            HttpRequest req =
+                    HttpRequest.newBuilder(URI.create(privacyUrl))
+                            .timeout(Duration.ofSeconds(30))
+                            .GET()
+                            .build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                throw new IOException("HTTP " + resp.statusCode());
+            }
+            Path tempHtml = Files.createTempFile("jpdfbookmarks-privacy-notice-", ".html");
+            Files.writeString(tempHtml, resp.body(), StandardCharsets.UTF_8);
+            tempHtml.toFile().deleteOnExit();
+            Desktop.getDesktop().browse(tempHtml.toUri());
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            JOptionPane.showMessageDialog(
+                    jOptionPaneParent(),
+                    Res.getString("ERROR_LAUNCHING_BROWSER") + " " + privacyUrl,
+                    Res.getString("AI_INDEX_DIALOG_TITLE"),
+                    JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void setFormEnabled(boolean enabled) {

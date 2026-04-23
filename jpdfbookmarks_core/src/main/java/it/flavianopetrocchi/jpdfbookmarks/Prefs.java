@@ -85,6 +85,7 @@ public class Prefs {
      */
     private final String AI_EXTRACTION_MODE_EXPLICIT = "AI_EXTRACTION_MODE_EXPLICIT";
     private final String AI_CLOUD_PROCESS_INDEX_URL = "AI_CLOUD_PROCESS_INDEX_URL";
+    private final String AI_CLOUD_UPLOAD_CONSENT_REMEMBERED = "AI_CLOUD_UPLOAD_CONSENT_REMEMBERED";
     private final String AI_CLOUD_ANON_KEY = "AI_CLOUD_ANON_KEY";
     private final String AI_CLOUD_CHECK_PAYMENT_URL = "AI_CLOUD_CHECK_PAYMENT_URL";
     private final String AI_CLOUD_FETCH_BOOKMARKS_URL = "AI_CLOUD_FETCH_BOOKMARKS_URL";
@@ -467,6 +468,18 @@ public class Prefs {
                 && !getCloudSupabaseAnonKey().trim().isEmpty();
     }
 
+    /**
+     * Se {@code true}, l'utente ha gi\u00e0 accettato sul dispositivo l'avviso che l'estrazione cloud invia contenuti
+     * del PDF a un server esterno e non si ripropone il popup prima dell'upload.
+     */
+    public boolean getNeverAskCloudUploadConsent() {
+        return userPrefs.getBoolean(AI_CLOUD_UPLOAD_CONSENT_REMEMBERED, false);
+    }
+
+    public void setNeverAskCloudUploadConsent(boolean neverAsk) {
+        userPrefs.putBoolean(AI_CLOUD_UPLOAD_CONSENT_REMEMBERED, neverAsk);
+    }
+
     public String getCloudProcessIndexUrl() {
         String v = userPrefs.get(AI_CLOUD_PROCESS_INDEX_URL, "");
         if (v != null && !v.trim().isEmpty()) {
@@ -580,14 +593,28 @@ public class Prefs {
     }
 
     /**
-     * Se {@code checkPaymentUrl} punta a {@code …/functions/v1/check-payment}, restituisce la URL gemella per
-     * {@code stripe-catalog-prices}; altrimenti stringa vuota.
+     * URL della privacy notice cloud. Se non configurata esplicitamente nel backend companion, viene derivata dallo
+     * stesso host/function group di {@code check-payment} o, in fallback, di {@code process-index}.
      */
-    static String deriveStripeCatalogPricesUrlFromCheckPayment(String checkPaymentUrl) {
-        if (checkPaymentUrl == null) {
+    public String getCloudPrivacyNoticeUrl() {
+        String derivedFromCheck =
+                deriveSiblingFunctionUrl(getCloudCheckPaymentUrl(), "check-payment", "privacy-notice");
+        if (!derivedFromCheck.isEmpty()) {
+            return derivedFromCheck;
+        }
+        return deriveSiblingFunctionUrl(getCloudProcessIndexUrl(), "process-index", "privacy-notice");
+    }
+
+    /**
+     * Se {@code baseUrl} punta a {@code …/functions/v1/<fromFunctionName>}, restituisce la URL gemella per
+     * {@code <toFunctionName>}; altrimenti stringa vuota.
+     */
+    static String deriveSiblingFunctionUrl(
+            String baseUrl, String fromFunctionName, String toFunctionName) {
+        if (baseUrl == null || fromFunctionName == null || toFunctionName == null) {
             return "";
         }
-        String u = checkPaymentUrl.trim();
+        String u = baseUrl.trim();
         if (u.isEmpty()) {
             return "";
         }
@@ -595,10 +622,18 @@ public class Prefs {
         if (q >= 0) {
             u = u.substring(0, q);
         }
-        if (!u.endsWith("check-payment")) {
+        if (!u.endsWith(fromFunctionName)) {
             return "";
         }
-        return u.substring(0, u.length() - "check-payment".length()) + "stripe-catalog-prices";
+        return u.substring(0, u.length() - fromFunctionName.length()) + toFunctionName;
+    }
+
+    /**
+     * Se {@code checkPaymentUrl} punta a {@code …/functions/v1/check-payment}, restituisce la URL gemella per
+     * {@code stripe-catalog-prices}; altrimenti stringa vuota.
+     */
+    static String deriveStripeCatalogPricesUrlFromCheckPayment(String checkPaymentUrl) {
+        return deriveSiblingFunctionUrl(checkPaymentUrl, "check-payment", "stripe-catalog-prices");
     }
 
     public void setCloudStripePricesUrl(String value) {

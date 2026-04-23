@@ -496,6 +496,8 @@ public final class JPDFBoxViewPanel extends JScrollPane implements IPdfView {
         boolean hasPrevious = (pageIndex > 0);
         boolean hasNext = (pageIndex < (numberOfPages - 1));
 
+        page = document != null && numberOfPages > 0
+                ? document.getPage(pageIndex) : null;
         updateCurrentPageBoxes();
 
         rendererPanel.repaint();

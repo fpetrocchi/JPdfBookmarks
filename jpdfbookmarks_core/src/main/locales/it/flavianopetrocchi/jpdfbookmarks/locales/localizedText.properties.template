@@ -346,3 +346,7 @@ SHOW_THUMBNAILS=Show Thumbnails
 ACTION_DONATE=Donate
 ACTION_DONATE_DESCR=Donate to this project
 MENU_DONATE_MNEMONIC=D
+AI_INDEX_CLOUD_CONSENT_MESSAGE=The selected index pages will be sent to an external server for AI processing.<br><br>JPdfBookmarks uploads an image of the selected pages and any text extracted from those pages. Continue only if you are authorized to send this document content to a third-party service.
+AI_INDEX_CLOUD_CONSENT_REMEMBER=Don't ask again on this device for cloud index extraction
+AI_INDEX_CLOUD_CONSENT_CONTINUE=Send to cloud
+AI_INDEX_CLOUD_CONSENT_PRIVACY_BUTTON=Privacy notice

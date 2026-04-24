@@ -231,6 +231,35 @@ image:tools_dump_002.png[]
                      --show-on-open <YES | NO | CHECK> | --help | --version]
                      [--out <output.pdf>]**
 
+== （選用）手動加入 JPEG2000 支援（最終使用者）
+
+JPdfBookmarks 官方發佈包預設不包含 JPEG2000 解碼器。
+如果你需要開啟含 JPEG2000 圖片的 PDF，可以在你自己的安裝目錄手動加入對應 jar。
+
+=== 需要的 jar
+
+請從 Maven Central 下載以下兩個檔案：
+
+* `com.github.jai-imageio:jai-imageio-core:1.4.0`
+* `com.github.jai-imageio:jai-imageio-jpeg2000:1.4.0`
+
+=== 安裝步驟
+
+1. 關閉 JPdfBookmarks。
+2. 開啟你解壓縮後的 JPdfBookmarks 安裝目錄。
+3. 將上述兩個 jar 複製到 `lib/` 目錄（與其他執行期 jar 同一層）。
+4. 重新啟動 JPdfBookmarks（`jpdfbookmarks.exe`、`jpdfbookmarks_cli.exe` 或 Linux 啟動腳本）。
+
+=== 驗證方式
+
+重新開啟先前失敗的 PDF。若設定成功，terminal 不應再出現：
+`Cannot read JPEG2000 image: Java Advanced Imaging (JAI) Image I/O Tools are not installed`
+
+=== 授權提醒
+
+`jai-imageio-jpeg2000` 含有 JJ2000 授權內容，上游專案文件指出它不屬於 GPL-3 相容授權。
+因此 JPdfBookmarks 不會預設隨程式打包此元件；是否安裝由最終使用者自行決定並承擔其授權條款。
+
 
 
 Here follows a short help on the jpdfbookmarks parameters.

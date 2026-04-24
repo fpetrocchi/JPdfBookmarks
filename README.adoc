@@ -72,6 +72,38 @@ Same as README Section `HOW TO EXECUTE`
 
 More Details Please Read jpdfbookmarks-3.0.2-SNAPSHOT.tar.gz/docs/USERGUIDE_zh_TW.html
 
+== Optional JPEG2000 support (user-installed)
+
+JPdfBookmarks does not bundle a JPEG2000 decoder in the official distribution.
+If you need to open PDFs containing JPEG2000 images, you can add decoder jars
+locally in your own installation.
+
+=== Required jars
+
+Download these two jars from Maven Central:
+
+* `com.github.jai-imageio:jai-imageio-core:1.4.0`
+* `com.github.jai-imageio:jai-imageio-jpeg2000:1.4.0`
+
+=== Installation steps
+
+1. Close JPdfBookmarks.
+2. Open your extracted JPdfBookmarks folder.
+3. Copy both jars into the `lib/` directory (the same folder with other runtime jars).
+4. Start JPdfBookmarks again (`jpdfbookmarks.exe`, `jpdfbookmarks_cli.exe`, or launcher script).
+
+=== Verify
+
+Open a PDF that previously logged:
+`Cannot read JPEG2000 image: Java Advanced Imaging (JAI) Image I/O Tools are not installed`.
+If the jars are loaded correctly, that error should disappear.
+
+=== License note
+
+The JPEG2000 plugin above includes code under the JJ2000 license, which upstream
+documents as not GPL-3 compatible for project redistribution. For this reason,
+JPdfBookmarks does not ship it by default. Installing it manually is an end-user choice.
+
 == Why Change to Maven Build Tools?
 
 * Package

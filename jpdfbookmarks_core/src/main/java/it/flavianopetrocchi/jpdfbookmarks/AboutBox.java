@@ -64,7 +64,7 @@ public class AboutBox extends javax.swing.JDialog {
         txtMail.setCursor(handCursor);
         txtHomepage.setCursor(handCursor);
         txtBlog.setCursor(handCursor);
-        btnDonate.setText("Dona a JPdfBookmarks");
+        btnDonate.setText(Res.getString("ACTION_DONATE"));
         btnDonate.setToolTipText(Res.getString("ACTION_DONATE_DESCR"));
         btnDonate.setBackground(new Color(255, 196, 0));
         btnDonate.setForeground(Color.BLACK);
@@ -232,7 +232,7 @@ public class AboutBox extends javax.swing.JDialog {
 
         appVendorLabel1.setText("GNU General Public License Version 3"); // NOI18N
 
-        btnDonate.setText("Dona a JPdfBookmarks");
+        btnDonate.setText(bundle.getString("ACTION_DONATE")); // NOI18N
         btnDonate.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnDonateActionPerformed(evt);

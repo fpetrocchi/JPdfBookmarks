@@ -416,7 +416,9 @@
         </Component>
         <Component class="javax.swing.JButton" name="btnDonate">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Dona a JPdfBookmarks" noResource="true"/>
+            <Property name="text" type="java.lang.String" editor="org.netbeans.modules.i18n.form.FormI18nStringEditor">
+              <ResourceString bundle="it/flavianopetrocchi/jpdfbookmarks/locales/localizedText.properties" key="ACTION_DONATE" replaceFormat="java.util.ResourceBundle.getBundle(&quot;{bundleNameSlashes}&quot;).getString(&quot;{key}&quot;)"/>
+            </Property>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnDonateActionPerformed"/>

@@ -27,6 +27,9 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.font.TextAttribute;
+import java.util.HashMap;
+import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultCellEditor;
 import javax.swing.JLabel;
@@ -62,6 +65,7 @@ public class BookmarksTree extends MouseDraggableTree implements CellEditorListe
 
     public void setLastFollowedBookmark(Bookmark b) {
         lastFollowedBookmark = b;
+        repaint();
     }
 
     public Bookmark getLastFollowedBookmark() {
@@ -160,6 +164,9 @@ public class BookmarksTree extends MouseDraggableTree implements CellEditorListe
                 Object value, boolean sel, boolean expanded,
                 boolean leaf, int row, boolean hasFocus) {
 
+            Component res = super.getTreeCellRendererComponent(tree, value,
+                    sel, expanded, leaf, row, hasFocus);
+
             Bookmark node = null;
             if (value instanceof Bookmark) {
 
@@ -173,21 +180,30 @@ public class BookmarksTree extends MouseDraggableTree implements CellEditorListe
                 }
                 Font font = new Font(getFont().getFamily(), styleMask,
                         getFont().getSize());
+                // Mark the last followed bookmark with an underline. Using an
+                // underline (instead of disabling the label, which made the
+                // text unreadable once re-focused) keeps the text fully
+                // legible in every selection state and does not conflict with
+                // the user-controlled bold/italic styles.
+                if (node.equals(lastFollowedBookmark)) {
+                    Map<TextAttribute, Object> attrs = new HashMap<TextAttribute, Object>(font.getAttributes());
+                    attrs.put(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON);
+                    font = font.deriveFont(attrs);
+                }
                 setFont(font);
 
-//                if (lastFollowedBookmark != null && node.equals(lastFollowedBookmark)) {
-                if (node.equals(lastFollowedBookmark)) {
-                    setEnabled(false);
-                } else {
-                    setEnabled(true);
-                }
+                setEnabled(true);
 
-                setForeground(node.getColor());
+                if (sel) {
+                    java.awt.Color selectionForeground = UIManager.getColor("Tree.selectionForeground");
+                    if (selectionForeground != null) {
+                        setForeground(selectionForeground);
+                    }
+                } else {
+                    setForeground(node.getColor());
+                }
                 setText(node.getTitle() + " ");
             }
-
-            Component res = super.getTreeCellRendererComponent(tree, value,
-                    sel, expanded, leaf, row, hasFocus);
 
             return res;
         }

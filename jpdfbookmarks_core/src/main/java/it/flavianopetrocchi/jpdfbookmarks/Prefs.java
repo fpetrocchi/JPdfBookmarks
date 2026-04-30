@@ -369,7 +369,7 @@ public class Prefs {
     }
 
     int getNumClicks() {
-        return userPrefs.getInt(NUM_CLICKS, 2);
+        return userPrefs.getInt(NUM_CLICKS, 1);
     }
 
     void setNumClicks(int n) {

@@ -613,7 +613,7 @@ public class AiIndexBookmarksDialog extends JDialog {
                         JOptionPane.WARNING_MESSAGE,
                         null,
                         options,
-                        cancelOption);
+                        continueOption);
         if (choice != 0) {
             return false;
         }

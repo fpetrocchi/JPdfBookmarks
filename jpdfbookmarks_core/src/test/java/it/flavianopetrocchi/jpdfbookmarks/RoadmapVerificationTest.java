@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLightLaf;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
@@ -47,6 +50,17 @@ class RoadmapVerificationTest {
     @Test
     void bundledCloudDefaultsResourceLoads() {
         assertNotNull(AiCloudBundledDefaults.get());
+    }
+
+    @Test
+    void bundledCjkGlobalFontOverrideDefaultsToDisabled() throws IOException {
+        Properties props = new Properties();
+        try (InputStream input = getClass().getClassLoader()
+                .getResourceAsStream("conf/jpdfbookmarks.cjk.font.properties")) {
+            assertNotNull(input);
+            props.load(input);
+        }
+        assertEquals("false", props.getProperty("cjk.applyGlobalFontOverride"));
     }
 
     @Test

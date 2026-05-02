@@ -340,10 +340,11 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     private Action extractLinks;
     private Action copyBookmarkFromViewAction;// </editor-fold>
 
-    /**
-     * Optional: load {@code jpdfbookmarks.cjk.font.properties} from the classpath and replace {@link FontUIResource}
-     * entries in {@link UIManager} defaults (CJK bookmark tree display).
-     */
+    private static final String CJK_FONT_PROPERTIES = "jpdfbookmarks.cjk.font.properties";
+    private static final String CJK_GLOBAL_FONT_OVERRIDE_PROPERTY = "cjk.applyGlobalFontOverride";
+    private static final String CJK_GLOBAL_FONT_OVERRIDE_SYSTEM_PROPERTY =
+            "jpdfbookmarks.cjk.applyGlobalFontOverride";
+
     /**
      * Values in {@code .properties} are sometimes written with surrounding {@code "…"} for readability;
      * {@link java.util.Properties} keeps the quotes as part of the value, unlike shell-style stripping.
@@ -369,22 +370,28 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         }
     }
 
+    /**
+     * Optional: load {@code jpdfbookmarks.cjk.font.properties} from the classpath and replace {@link FontUIResource}
+     * entries in {@link UIManager} defaults (CJK bookmark tree display). The override is opt-in because applying a
+     * bundled CJK font globally changes the standard Windows UI font metrics in release packages.
+     */
     private static void initGlobalFont() {
-        final String cjkProperties = "jpdfbookmarks.cjk.font.properties";
         String fontName = "Noto Serif CJK TC";
         int fontSize = 20;
         Properties props = new Properties();
-        try (InputStream input =
-                JPdfBookmarksGui.class.getClassLoader().getResourceAsStream(cjkProperties)) {
+        try (InputStream input = openCjkFontProperties()) {
             if (input == null) {
-                Logger.getLogger(JPdfBookmarksGui.class.getName())
-                        .log(
-                                Level.WARNING,
-                                "Optional file {0} not on classpath; CJK font override skipped.",
-                                cjkProperties);
+                Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.FINE,
+                        "Optional file {0} not on classpath; CJK font override skipped.",
+                        CJK_FONT_PROPERTIES);
                 return;
             }
             props.load(input);
+            if (!isCjkGlobalFontOverrideEnabled(props)) {
+                Logger.getLogger(JPdfBookmarksGui.class.getName()).log(Level.FINE,
+                        "CJK global font override is disabled.");
+                return;
+            }
             String pName = props.getProperty("cjk.fontName");
             if (pName != null && !pName.isBlank()) {
                 fontName = stripOptionalUiPropertyQuotes(pName.trim());
@@ -398,7 +405,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
             Logger.getLogger(JPdfBookmarksGui.class.getName())
                     .log(
                             Level.WARNING,
-                            "Could not apply CJK font properties from " + cjkProperties + "; ignoring.",
+                            "Could not apply CJK font properties from " + CJK_FONT_PROPERTIES + "; ignoring.",
                             ex);
             return;
         }
@@ -410,6 +417,23 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
                 UIManager.put(key, fontUi);
             }
         }
+    }
+
+    private static InputStream openCjkFontProperties() {
+        ClassLoader classLoader = JPdfBookmarksGui.class.getClassLoader();
+        InputStream input = classLoader.getResourceAsStream(CJK_FONT_PROPERTIES);
+        if (input != null) {
+            return input;
+        }
+        return classLoader.getResourceAsStream("conf/" + CJK_FONT_PROPERTIES);
+    }
+
+    private static boolean isCjkGlobalFontOverrideEnabled(Properties props) {
+        String value = System.getProperty(CJK_GLOBAL_FONT_OVERRIDE_SYSTEM_PROPERTY);
+        if (value == null) {
+            value = props.getProperty(CJK_GLOBAL_FONT_OVERRIDE_PROPERTY, "false");
+        }
+        return Boolean.parseBoolean(stripOptionalUiPropertyQuotes(value.trim()));
     }
 
     private void saveWindowState() {

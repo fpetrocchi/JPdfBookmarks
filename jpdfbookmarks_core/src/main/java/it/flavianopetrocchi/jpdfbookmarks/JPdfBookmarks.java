@@ -50,6 +50,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -130,9 +131,31 @@ class JPdfBookmarks {
 
     //<editor-fold defaultstate="expanded" desc="public methods">
     public static void main(String[] args) {
+        configureDpiBeforeSwing();
         localizeExternalModules();
         JPdfBookmarks app = new JPdfBookmarks();
         app.start(args);
+    }
+
+    /**
+     * FlatLaf combines JRE HiDPI (per-monitor transforms) with an extra &quot;user scaling&quot;
+     * mode on Windows when the LaF/system font heuristic signals &quot;text scaling&quot;.
+     * Launchers such as {@code jpackage} can behave differently than the IDE JVM, yielding
+     * oversized widgets next to Win32/OLE hosts (e.g. Word). Prefer JRE scaling only unless
+     * {@code flatlaf.uiScale.enabled} is already set externally.
+     */
+    private static void configureDpiBeforeSwing() {
+        String osName = System.getProperty("os.name", "");
+        if (!osName.toLowerCase(Locale.ROOT).startsWith("windows")) {
+            return;
+        }
+        if (System.getProperty("flatlaf.uiScale.enabled") != null) {
+            return;
+        }
+        System.setProperty("flatlaf.uiScale.enabled", "false");
+        if (System.getProperty("flatlaf.useNativeLibrary") == null) {
+            System.setProperty("flatlaf.useNativeLibrary", "false");
+        }
     }
 
     public static String getVersion() {

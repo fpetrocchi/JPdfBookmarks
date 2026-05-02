@@ -26,8 +26,10 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.service.AiServices;
+import it.flavianopetrocchi.jpdfbookmarks.AiReleasePolicy;
 import it.flavianopetrocchi.jpdfbookmarks.Prefs;
 import it.flavianopetrocchi.jpdfbookmarks.Res;
+import java.text.MessageFormat;
 import it.flavianopetrocchi.jpdfbookmarks.ai.agent.BookmarkExtractorAgent;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.AiOrchestrator;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.PdfVisionService;
@@ -87,7 +89,8 @@ public final class AiOrchestratorFactory {
     }
 
     /**
-     * Crea l'orchestrator in base a {@link Prefs#getAiProvider()} e ai campi correlati.
+     * Crea l'orchestrator in base a {@link Prefs#getAiExtractionMode()} / cloud e, solo in dev, a
+     * {@link Prefs#getAiProvider()} per locale.
      *
      * @param prefs preferenze applicative (non {@code null}); usare l'istanza della finestra principale
      *              se disponibile, così le modifiche in opzioni sono visibili senza nuovo {@code Prefs}.
@@ -101,12 +104,16 @@ public final class AiOrchestratorFactory {
                             prefs.getCloudSupabaseAnonKey().trim(),
                             prefs.getCloudCheckPaymentUrl(),
                             prefs.getCloudFetchFullResultsUrl(),
-                            prefs.getCloudStripePricesUrl());
+                            prefs.getCloudStripePricesUrl(),
+                            prefs.getCloudCreateCheckoutUrl());
             PdfVisionService vision = new PdfVisionService(OPENAI_INDEX_RENDER_DPI);
             return new AiOrchestrator(vision, null, false, cloud, prefs.getCloudProcessIndexModel());
         }
         if (Prefs.AI_EXTRACTION_MODE_CLOUD.equals(prefs.getAiExtractionMode())) {
-            throw new IllegalStateException(Res.getString("AI_ERROR_CLOUD_EXTRACTION_HINT"));
+            throw new IllegalStateException(
+                    AiReleasePolicy.isAdvancedAiOptionsTabEnabled()
+                            ? Res.getString("AI_ERROR_CLOUD_EXTRACTION_HINT")
+                            : Res.getString("AI_ERROR_CLOUD_EXTRACTION_CONSUMER"));
         }
         ChatModel chatModel = buildChatModel(prefs);
         BookmarkExtractorAgent agent =
@@ -125,8 +132,7 @@ public final class AiOrchestratorFactory {
         if ("openai".equals(provider)) {
             String apiKey = prefs.getOpenAiApiKey().trim();
             if (apiKey.isEmpty()) {
-                throw new IllegalStateException(
-                        "OpenAI: configure the API key in Options (Artificial intelligence tab).");
+                throw new IllegalStateException(Res.getString("AI_ERROR_OPENAI_API_KEY"));
             }
             return OpenAiChatModel.builder()
                     .apiKey(apiKey)
@@ -151,8 +157,8 @@ public final class AiOrchestratorFactory {
                     .build();
         }
         throw new IllegalStateException(
-                "Unknown AI provider: \""
-                        + prefs.getAiProvider()
-                        + "\". Choose OpenAI or Ollama in Options (Artificial intelligence tab).");
+                MessageFormat.format(
+                        Res.getString("AI_ERROR_AI_PROVIDER_UNKNOWN"),
+                        prefs.getAiProvider()));
     }
 }

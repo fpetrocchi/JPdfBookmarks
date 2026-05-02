@@ -344,6 +344,17 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
      * Optional: load {@code jpdfbookmarks.cjk.font.properties} from the classpath and replace {@link FontUIResource}
      * entries in {@link UIManager} defaults (CJK bookmark tree display).
      */
+    /**
+     * Values in {@code .properties} are sometimes written with surrounding {@code "…"} for readability;
+     * {@link java.util.Properties} keeps the quotes as part of the value, unlike shell-style stripping.
+     */
+    private static String stripOptionalUiPropertyQuotes(String s) {
+        if (s.length() >= 2 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+            return s.substring(1, s.length() - 1);
+        }
+        return s;
+    }
+
     private static void registerFlatLafChoices() {
         try {
             Class.forName("com.formdev.flatlaf.FlatLightLaf");
@@ -376,11 +387,12 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
             props.load(input);
             String pName = props.getProperty("cjk.fontName");
             if (pName != null && !pName.isBlank()) {
-                fontName = pName.trim();
+                fontName = stripOptionalUiPropertyQuotes(pName.trim());
             }
             String pSize = props.getProperty("cjk.fontSize");
             if (pSize != null && !pSize.isBlank()) {
-                fontSize = Integer.parseInt(pSize.trim());
+                fontSize =
+                        Integer.parseInt(stripOptionalUiPropertyQuotes(pSize.trim()));
             }
         } catch (IOException | NumberFormatException ex) {
             Logger.getLogger(JPdfBookmarksGui.class.getName())
@@ -436,8 +448,6 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
      */
     public void initGui() {
         registerFlatLafChoices();
-        //FIX BUG - GUI Bookmarks display CJK char being noto problem
-        initGlobalFont();
 
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         Authenticator.setDefault(new ProxyAuthenticator(this, true));
@@ -451,6 +461,8 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         setTitle(title);
         setIconImage(Res.getIcon(getClass(), "gfx/jpdfbookmarks.png").getImage());
         loadWindowState();
+        /* Dopo FlatLaf: uniforma i FontUIResource CJK così UIScale/heuristic non combinano prefissi Metal con il LaF finale. */
+        initGlobalFont();
 
         fileOperator = new UnifiedFileOperator();
         viewPanel = fileOperator.getViewPanel();
@@ -762,6 +774,8 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
     @Override
     public void valueChanged(TreeSelectionEvent e) {
         Bookmark bookmark = getSelectedBookmark();
+        TreePath[] paths = bookmarksTree.getSelectionPaths();
+        int selectionCount = paths == null ? 0 : paths.length;
 
         //enable or disable actions applicable to multiple bookmarks
         Ut.enableActions((bookmark != null), setBoldAction, setItalicAction,
@@ -770,8 +784,7 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
                 addLaunchLinkAction);
 
         //enable or disable actions applicable to only a single bookmark
-        TreePath[] paths = bookmarksTree.getSelectionPaths();
-        Ut.enableActions((bookmark != null) && (paths.length == 1),
+        Ut.enableActions((bookmark != null) && (selectionCount == 1),
                 addChildAction, showActionsDialog);
 
         //Ut.enableComponents((bookmark != null), cutMenuItem, copyMenuItem);
@@ -1941,7 +1954,16 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
 
     private void applyPageOffsetDialog() {
         TreePath[] paths = bookmarksTree.getSelectionPaths();
-        int maxPageNumber = -1, minPageNumber = viewPanel.getNumPages();
+        if (paths == null || paths.length == 0) {
+            return;
+        }
+        Bookmark selected = getSelectedBookmark();
+        if (selected == null) {
+            return;
+        }
+
+        int maxPageNumber = Integer.MIN_VALUE;
+        int minPageNumber = Integer.MAX_VALUE;
         for (TreePath path : paths) {
             Bookmark bookmark = (Bookmark) path.getLastPathComponent();
             int targetPage = bookmark.getPageNumber();
@@ -1952,11 +1974,25 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
                 minPageNumber = targetPage;
             }
         }
-        Bookmark selected = getSelectedBookmark();
+
+        if (maxPageNumber == Integer.MIN_VALUE || minPageNumber == Integer.MAX_VALUE) {
+            return;
+        }
+
+        int minOffset = 1 - minPageNumber;
+        int maxOffset = viewPanel.getNumPages() - maxPageNumber;
+        int initialOffset = viewPanel.getPageNumber() - selected.getPageNumber();
+
+        // Keep spinner constraints valid even with out-of-range bookmarks.
+        if (minOffset > maxOffset) {
+            minOffset = initialOffset;
+            maxOffset = initialOffset;
+        } else {
+            initialOffset = Math.max(minOffset, Math.min(maxOffset, initialOffset));
+        }
+
         PageOffsetDialog pageOffsetDialog = new PageOffsetDialog(
-                this, viewPanel.getPageNumber() - selected.getPageNumber(),
-                viewPanel.getNumPages() - maxPageNumber,
-                -minPageNumber + 1);
+                this, initialOffset, maxOffset, minOffset);
         pageOffsetDialog.setVisible(true);
         if (pageOffsetDialog.operationNotAborted()) {
             UndoablePageOffset undoablePageOffset = new UndoablePageOffset(

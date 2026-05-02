@@ -35,7 +35,7 @@ public class OptionsDlg extends javax.swing.JDialog {
 
     /** Sviluppo: {@code -Djpdfbookmarks.dev.showAiOptions=true} per mostrare il tab IA (nascosto agli utenti finali). */
     public static boolean isAiOptionsTabVisible() {
-        return Boolean.getBoolean("jpdfbookmarks.dev.showAiOptions");
+        return AiReleasePolicy.isAdvancedAiOptionsTabEnabled();
     }
 
     private Prefs userPrefs = new Prefs();

@@ -80,16 +80,22 @@ public class Prefs {
 
     private final String AI_EXTRACTION_MODE = "AI_EXTRACTION_MODE";
     /**
-     * Se {@code true}, {@link #getAiExtractionMode()} usa solo le preferenze salvate; se {@code false} e i default
-     * bundled sono completi, la modalità cloud è scelta automaticamente (build distribuita senza tab IA).
+     * Se {@code true}, in build di sviluppo (tab IA visibile) {@link #getAiExtractionMode()} rispetta locale/cloud
+     * salvato dall'utente. Nella build senza tab IA, {@link #getAiExtractionMode()} è sempre cloud.
      */
     private final String AI_EXTRACTION_MODE_EXPLICIT = "AI_EXTRACTION_MODE_EXPLICIT";
     private final String AI_CLOUD_PROCESS_INDEX_URL = "AI_CLOUD_PROCESS_INDEX_URL";
     private final String AI_CLOUD_UPLOAD_CONSENT_REMEMBERED = "AI_CLOUD_UPLOAD_CONSENT_REMEMBERED";
-    private final String AI_CLOUD_ANON_KEY = "AI_CLOUD_ANON_KEY";
+    /** JWT anon pubblica Supabase (campo dedicato dal 2025; evita collisioni con {@link #AI_OPENAI_API_KEY}). */
+    private final String AI_CLOUD_SUPABASE_ANON_KEY = "AI_CLOUD_SUPABASE_ANON_KEY";
+
+    /** Deprecato: in passato ospitava l'anon Supabase; ora preferire {@link #AI_CLOUD_SUPABASE_ANON_KEY}. */
+    private final String AI_CLOUD_ANON_KEY_LEGACY = "AI_CLOUD_ANON_KEY";
     private final String AI_CLOUD_CHECK_PAYMENT_URL = "AI_CLOUD_CHECK_PAYMENT_URL";
     private final String AI_CLOUD_FETCH_BOOKMARKS_URL = "AI_CLOUD_FETCH_BOOKMARKS_URL";
     private final String AI_CLOUD_FETCH_FULL_RESULTS_URL = "AI_CLOUD_FETCH_FULL_RESULTS_URL";
+    /** Edge Function che restituisce un URL di checkout opaco (provider-agnostic). */
+    private final String AI_CLOUD_CREATE_CHECKOUT_URL = "AI_CLOUD_CREATE_CHECKOUT_URL";
     private final String AI_CLOUD_STRIPE_CHECKOUT_MINI_URL = "AI_CLOUD_STRIPE_CHECKOUT_MINI_URL";
     private final String AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL = "AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL";
     private final String AI_CLOUD_STRIPE_PRICES_URL = "AI_CLOUD_STRIPE_PRICES_URL";
@@ -420,10 +426,15 @@ public class Prefs {
     }
 
     /**
-     * {@value #AI_EXTRACTION_MODE_LOCAL} oppure {@value #AI_EXTRACTION_MODE_CLOUD}. Senza scelta esplicita in
-     * opzioni, se {@link AiCloudBundledDefaults} fornisce URL e chiave anon, si usa {@value #AI_EXTRACTION_MODE_CLOUD}.
+     * {@value #AI_EXTRACTION_MODE_LOCAL} oppure {@value #AI_EXTRACTION_MODE_CLOUD}.
+     * <p>
+     * Distribuzione senza scheda IA ({@link AiReleasePolicy}): si usa sempre il cloud backend; gli utenti non possono
+     * impostare OpenAI/Ollama in Opzioni. In sviluppo, con tab IA visibile, valgono le preferenze e i default sopra riportati.
      */
     public String getAiExtractionMode() {
+        if (!AiReleasePolicy.isAdvancedAiOptionsTabEnabled()) {
+            return AI_EXTRACTION_MODE_CLOUD;
+        }
         if (isAiExtractionModeExplicitlyChosen()) {
             return normalizeAiExtractionMode(userPrefs.get(AI_EXTRACTION_MODE, AI_EXTRACTION_MODE_LOCAL));
         }
@@ -493,15 +504,43 @@ public class Prefs {
     }
 
     public String getCloudSupabaseAnonKey() {
-        String v = userPrefs.get(AI_CLOUD_ANON_KEY, "");
-        if (v != null && !v.trim().isEmpty()) {
-            return v.trim();
+        String primary = trimToNull(userPrefs.get(AI_CLOUD_SUPABASE_ANON_KEY, ""));
+        if (primary != null) {
+            return primary;
+        }
+        String legacy = trimToNull(userPrefs.get(AI_CLOUD_ANON_KEY_LEGACY, ""));
+        if (legacy != null && !looksLikeSkStyleSecret(legacy)) {
+            return legacy;
         }
         return AiCloudBundledDefaults.get().anonKey();
     }
 
     public void setCloudSupabaseAnonKey(String value) {
-        userPrefs.put(AI_CLOUD_ANON_KEY, value != null ? value : "");
+        String v = value != null ? value.trim() : "";
+        if (v.isEmpty()) {
+            userPrefs.remove(AI_CLOUD_SUPABASE_ANON_KEY);
+            userPrefs.remove(AI_CLOUD_ANON_KEY_LEGACY);
+            return;
+        }
+        userPrefs.put(AI_CLOUD_SUPABASE_ANON_KEY, v);
+        userPrefs.remove(AI_CLOUD_ANON_KEY_LEGACY);
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    /** True se la stringa assomiglia a una API key tipo OpenAI/xAI (sk-…), non ad un JWT Supabase. */
+    static boolean looksLikeSkStyleSecret(String s) {
+        if (s == null) {
+            return false;
+        }
+        String t = s.trim();
+        return t.length() >= 3 && t.regionMatches(true, 0, "sk-", 0, 3);
     }
 
     public String getCloudCheckPaymentUrl() {
@@ -550,26 +589,69 @@ public class Prefs {
         userPrefs.put(AI_CLOUD_FETCH_FULL_RESULTS_URL, value != null ? value.trim() : "");
     }
 
+    /**
+     * URL POST del backend che crea una sessione di pagamento e restituisce {@code checkoutUrl} (provider opaco).
+     * Ordine: preferenza dedicata, poi legacy {@link #getCloudStripeCheckoutMiniUrl()} se valorizzata in prefs,
+     * default Maven ({@code ai-cloud-defaults.properties}), altrimenti stesso host di
+     * {@link #getCloudCheckPaymentUrl()} con path {@code …/functions/v1/create-checkout} (come per
+     * {@link #getCloudStripePricesUrl()} e check-payment).
+     */
+    public String getCloudCreateCheckoutUrl() {
+        String v = userPrefs.get(AI_CLOUD_CREATE_CHECKOUT_URL, "");
+        if (v != null && !v.trim().isEmpty()) {
+            return v.trim();
+        }
+        String legacyMini = userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, "");
+        if (legacyMini != null && !legacyMini.trim().isEmpty()) {
+            return legacyMini.trim();
+        }
+        String bundled = AiCloudBundledDefaults.get().createCheckoutUrl();
+        if (bundled != null && !bundled.trim().isEmpty()) {
+            return bundled.trim();
+        }
+        return deriveCreateCheckoutUrlFromCheckPayment(getCloudCheckPaymentUrl());
+    }
+
+    public void setCloudCreateCheckoutUrl(String value) {
+        userPrefs.put(AI_CLOUD_CREATE_CHECKOUT_URL, value != null ? value.trim() : "");
+    }
+
+    /**
+     * @deprecated Preferire {@link #getCloudCreateCheckoutUrl()}; conservato per migrazione da Payment Link diretti.
+     */
+    @Deprecated
     public String getCloudStripeCheckoutMiniUrl() {
         String v = userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, "");
         if (v != null && !v.trim().isEmpty()) {
             return v.trim();
         }
-        return AiCloudBundledDefaults.get().stripeCheckoutMiniUrl();
+        return "";
     }
 
+    /**
+     * @deprecated Integrato nel flusso {@link #getCloudCreateCheckoutUrl()} con tier scelto lato backend.
+     */
+    @Deprecated
     public void setCloudStripeCheckoutMiniUrl(String value) {
         userPrefs.put(AI_CLOUD_STRIPE_CHECKOUT_MINI_URL, value != null ? value.trim() : "");
     }
 
+    /**
+     * @deprecated Preferire {@link #getCloudCreateCheckoutUrl()} con tier {@code advanced} via backend.
+     */
+    @Deprecated
     public String getCloudStripeCheckoutAdvancedUrl() {
         String v = userPrefs.get(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, "");
         if (v != null && !v.trim().isEmpty()) {
             return v.trim();
         }
-        return AiCloudBundledDefaults.get().stripeCheckoutAdvancedUrl();
+        return "";
     }
 
+    /**
+     * @deprecated Integrato nel flusso {@link #getCloudCreateCheckoutUrl()} con tier scelto lato backend.
+     */
+    @Deprecated
     public void setCloudStripeCheckoutAdvancedUrl(String value) {
         userPrefs.put(AI_CLOUD_STRIPE_CHECKOUT_ADVANCED_URL, value != null ? value.trim() : "");
     }
@@ -634,6 +716,14 @@ public class Prefs {
      */
     static String deriveStripeCatalogPricesUrlFromCheckPayment(String checkPaymentUrl) {
         return deriveSiblingFunctionUrl(checkPaymentUrl, "check-payment", "stripe-catalog-prices");
+    }
+
+    /**
+     * Se {@code checkPaymentUrl} punta a {@code …/functions/v1/check-payment}, restituisce la URL gemella per
+     * {@code create-checkout}; altrimenti stringa vuota.
+     */
+    static String deriveCreateCheckoutUrlFromCheckPayment(String checkPaymentUrl) {
+        return deriveSiblingFunctionUrl(checkPaymentUrl, "check-payment", "create-checkout");
     }
 
     public void setCloudStripePricesUrl(String value) {

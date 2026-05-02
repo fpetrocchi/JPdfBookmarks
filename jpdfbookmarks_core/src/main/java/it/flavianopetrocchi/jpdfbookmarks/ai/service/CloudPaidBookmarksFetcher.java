@@ -29,7 +29,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Chiamate GET verso Supabase per verificare il pagamento e scaricare i segnalibri finali, tramite {@link SupabaseAiClient}.
+ * Chiamate HTTP verso Supabase (check-payment, create-checkout, ecc.) per pagamento e segnalibri, tramite
+ * {@link SupabaseAiClient}.
  */
 public final class CloudPaidBookmarksFetcher {
 
@@ -48,7 +49,15 @@ public final class CloudPaidBookmarksFetcher {
                         cfg.supabaseAnonKey(),
                         cfg.cloudCheckPaymentUrl(),
                         cfg.cloudFetchFullResultsUrl(),
-                        cfg.cloudStripePricesUrl()));
+                        cfg.cloudStripePricesUrl(),
+                        cfg.cloudCreateCheckoutUrl()));
+    }
+
+    /**
+     * Richiede al backend l'URL di checkout per il task; vedi {@link SupabaseAiClient#createCheckout(String, String)}.
+     */
+    public String createCheckout(String taskId, String tier) throws AiOrchestrationException {
+        return client.createCheckout(taskId, tier);
     }
 
     public boolean isPaid(String taskId) throws AiOrchestrationException {

@@ -38,7 +38,7 @@ public class AiOptionsPanel extends JPanel {
     private final JPasswordField fieldCloudAnonKey = new JPasswordField(32);
     private final JTextField fieldCloudCheckUrl = new JTextField(32);
     private final JTextField fieldCloudFetchFullUrl = new JTextField(32);
-    private final JTextField fieldCloudStripeMiniUrl = new JTextField(32);
+    private final JTextField fieldCloudCreateCheckoutUrl = new JTextField(32);
     private final JTextField fieldCloudStripePricesUrl = new JTextField(32);
 
     private final JPanel panelOpenAi;
@@ -227,11 +227,11 @@ public class AiOptionsPanel extends JPanel {
         c.gridy = 5;
         c.weightx = 0;
         c.fill = GridBagConstraints.NONE;
-        p.add(new JLabel(Res.getString("AI_OPTIONS_CLOUD_STRIPE_MINI_URL")), c);
+        p.add(new JLabel(Res.getString("AI_OPTIONS_CLOUD_CREATE_CHECKOUT_URL")), c);
         c.gridx = 1;
         c.weightx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
-        p.add(fieldCloudStripeMiniUrl, c);
+        p.add(fieldCloudCreateCheckoutUrl, c);
 
         c.gridx = 0;
         c.gridy = 6;
@@ -294,7 +294,7 @@ public class AiOptionsPanel extends JPanel {
         fieldCloudAnonKey.setText(SupabaseAiClient.normalizeSupabasePublicAnonKey(prefs.getCloudSupabaseAnonKey()));
         fieldCloudCheckUrl.setText(prefs.getCloudCheckPaymentUrl());
         fieldCloudFetchFullUrl.setText(prefs.getCloudFetchFullResultsUrl());
-        fieldCloudStripeMiniUrl.setText(prefs.getCloudStripeCheckoutMiniUrl());
+        fieldCloudCreateCheckoutUrl.setText(prefs.getCloudCreateCheckoutUrl());
         fieldCloudStripePricesUrl.setText(prefs.getCloudStripePricesUrl());
         updateModeVisibility();
     }
@@ -320,7 +320,7 @@ public class AiOptionsPanel extends JPanel {
                 SupabaseAiClient.normalizeSupabasePublicAnonKey(new String(fieldCloudAnonKey.getPassword())));
         prefs.setCloudCheckPaymentUrl(fieldCloudCheckUrl.getText().trim());
         prefs.setCloudFetchFullResultsUrl(fieldCloudFetchFullUrl.getText().trim());
-        prefs.setCloudStripeCheckoutMiniUrl(fieldCloudStripeMiniUrl.getText().trim());
+        prefs.setCloudCreateCheckoutUrl(fieldCloudCreateCheckoutUrl.getText().trim());
         prefs.setCloudStripePricesUrl(fieldCloudStripePricesUrl.getText().trim());
         if (radioCloud.isSelected()) {
             prefs.setCloudProcessIndexModel(Prefs.CLOUD_PROCESS_INDEX_MODEL_STANDARD);

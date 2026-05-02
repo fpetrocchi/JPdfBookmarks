@@ -77,6 +77,8 @@ public final class SupabaseAiClient {
     private final String fetchBookmarksUrl;
     /** GET pubblico (stessi header Supabase) che restituisce JSON catalogo prezzi; vedi {@link StripeCatalogPrices}. */
     private final String stripePricesUrl;
+    /** POST verso Edge Function {@code create-checkout}; URL opaco indipendente dal provider di pagamento. */
+    private final String createCheckoutUrl;
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(45)).build();
 
@@ -104,7 +106,7 @@ public final class SupabaseAiClient {
             String anonKey,
             String checkPaymentUrl,
             String fetchBookmarksUrl) {
-        this(processIndexUrl, anonKey, checkPaymentUrl, fetchBookmarksUrl, "");
+        this(processIndexUrl, anonKey, checkPaymentUrl, fetchBookmarksUrl, "", "");
     }
 
     public SupabaseAiClient(
@@ -113,11 +115,22 @@ public final class SupabaseAiClient {
             String checkPaymentUrl,
             String fetchBookmarksUrl,
             String stripePricesUrl) {
+        this(processIndexUrl, anonKey, checkPaymentUrl, fetchBookmarksUrl, stripePricesUrl, "");
+    }
+
+    public SupabaseAiClient(
+            String processIndexUrl,
+            String anonKey,
+            String checkPaymentUrl,
+            String fetchBookmarksUrl,
+            String stripePricesUrl,
+            String createCheckoutUrl) {
         this.processIndexUrl = Objects.requireNonNull(processIndexUrl, "processIndexUrl").trim();
         this.anonKey = normalizeSupabasePublicAnonKey(Objects.requireNonNull(anonKey, "anonKey"));
         this.checkPaymentUrl = checkPaymentUrl != null ? checkPaymentUrl.trim() : "";
         this.fetchBookmarksUrl = fetchBookmarksUrl != null ? fetchBookmarksUrl.trim() : "";
         this.stripePricesUrl = stripePricesUrl != null ? stripePricesUrl.trim() : "";
+        this.createCheckoutUrl = createCheckoutUrl != null ? createCheckoutUrl.trim() : "";
     }
 
     /**
@@ -261,6 +274,95 @@ public final class SupabaseAiClient {
      */
     public boolean checkPaymentStatus(String taskId) throws AiOrchestrationException {
         return checkPayment(taskId).paid();
+    }
+
+    /**
+     * POST {@code create-checkout}: chiede al backend un URL di pagamento per il task (contratto pdfbookmarks-backend:
+     * body {@code { "taskId", "tier" }}, risposta {@code { "checkoutUrl": "..." }}).
+     *
+     * @param tier {@code standard} o {@code advanced} (case-insensitive)
+     * @return URL da aprire nel browser (checkout provider-opaco)
+     */
+    public String createCheckout(String taskId, String tier) throws AiOrchestrationException {
+        if (createCheckoutUrl.isEmpty()) {
+            throw new AiOrchestrationException("Create-checkout URL is not configured in Options.", null);
+        }
+        if (anonKey.isEmpty()) {
+            throw new AiOrchestrationException("Supabase anon key is empty.", null);
+        }
+        if (taskId == null || taskId.isBlank()) {
+            throw new AiOrchestrationException("Task id is empty.", null);
+        }
+        String tierNorm = normalizeCheckoutTier(tier);
+        if (tierNorm == null) {
+            throw new AiOrchestrationException("Tier must be \"standard\" or \"advanced\".", null);
+        }
+        ObjectNode root = MAPPER.createObjectNode();
+        root.put("taskId", taskId.trim());
+        root.put("tier", tierNorm);
+        String jsonBody;
+        try {
+            jsonBody = MAPPER.writeValueAsString(root);
+        } catch (Exception e) {
+            throw new AiOrchestrationException("Failed to build create-checkout JSON.", e);
+        }
+        if (LOG.isLoggable(Level.INFO)) {
+            LOG.log(
+                    Level.INFO,
+                    "create-checkout: POST {0} | body={1} | anonJwtConfigured={2}",
+                    new Object[] {createCheckoutUrl, jsonBody, !anonKey.isEmpty()});
+        }
+        String body;
+        try {
+            body = httpPostJson(createCheckoutUrl, jsonBody);
+        } catch (AiOrchestrationException e) {
+            LOG.log(Level.WARNING, "create-checkout: HTTP error — " + e.getMessage());
+            throw e;
+        }
+        String checkoutPageUrl = parseCreateCheckoutResponse(body);
+        if (LOG.isLoggable(Level.INFO)) {
+            String host = "";
+            try {
+                host = URI.create(checkoutPageUrl.trim()).getHost();
+            } catch (Exception ignored) {
+                host = "(unparsed)";
+            }
+            LOG.log(Level.INFO, "create-checkout: OK, redirect host={0}", host);
+        }
+        return checkoutPageUrl;
+    }
+
+    private static String normalizeCheckoutTier(String tier) {
+        if (tier == null || tier.isBlank()) {
+            return null;
+        }
+        String t = tier.trim().toLowerCase(Locale.ROOT);
+        if ("standard".equals(t) || "advanced".equals(t)) {
+            return t;
+        }
+        return null;
+    }
+
+    private String parseCreateCheckoutResponse(String body) throws AiOrchestrationException {
+        JsonNode root = readTree(body);
+        if (root == null) {
+            throw new AiOrchestrationException("Empty response from create-checkout.", null);
+        }
+        String err = errorMessage(root);
+        if (err != null && !err.isBlank()) {
+            throw new AiOrchestrationException(err, null);
+        }
+        String url = firstText(root, "checkoutUrl", "checkout_url");
+        if (url == null || url.isBlank()) {
+            JsonNode data = unwrapData(root);
+            if (data != null) {
+                url = firstText(data, "checkoutUrl", "checkout_url");
+            }
+        }
+        if (url == null || url.trim().isEmpty()) {
+            throw new AiOrchestrationException("create-checkout response did not contain checkoutUrl.", null);
+        }
+        return url.trim();
     }
 
     /** {@code model_type} / {@code modelType} / {@code tier} dalla risposta check-payment (solo quando {@code paid}). */
@@ -627,12 +729,14 @@ public final class SupabaseAiClient {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int code = resp.statusCode();
             if (code < 200 || code >= 300) {
+                LOG.log(Level.WARNING, "POST {0} -> HTTP {1}", new Object[] {url, Integer.valueOf(code)});
                 throw cloudHttpError(code, resp.body());
             }
             return resp.body();
         } catch (AiOrchestrationException e) {
             throw e;
         } catch (Exception e) {
+            LOG.log(Level.WARNING, "POST {0} failed: {1}", new Object[] {url, e.toString()});
             throw new AiOrchestrationException("Network error calling cloud service: " + e.getMessage(), e);
         }
     }
@@ -659,6 +763,20 @@ public final class SupabaseAiClient {
         }
     }
 
+    /** Risposta HTML error page (CloudFront/WAF) invece di JSON Edge — evita dialog chilometrici. */
+    private static boolean looksLikeCdnOrHtmlBlockPage(String body) {
+        if (body == null || body.isBlank()) {
+            return false;
+        }
+        String b = body.trim();
+        String lower = b.toLowerCase(Locale.ROOT);
+        return b.startsWith("<!")
+                || lower.contains("<html")
+                || lower.contains("cloudfront")
+                || lower.contains("could not be satisfied")
+                || lower.contains("access denied");
+    }
+
     private static AiOrchestrationException cloudHttpError(int code, String body) {
         GatewayErrorBody parsed = parseGatewayErrorJson(body);
         boolean openAiUpstream401 =
@@ -672,6 +790,14 @@ public final class SupabaseAiClient {
                             + snippet
                             + "\n\n"
                             + Res.getString("AI_CLOUD_HTTP_401_HINT"),
+                    null);
+        }
+        if (code == 403 && looksLikeCdnOrHtmlBlockPage(body)) {
+            return new AiOrchestrationException(
+                    "Cloud request failed (HTTP 403): "
+                            + Res.getString("AI_CLOUD_HTTP_403_BLOCKED_BODY")
+                            + "\n\n"
+                            + Res.getString("AI_CLOUD_HTTP_403_HINT"),
                     null);
         }
         String headline = "Cloud request failed (HTTP " + code + ")";

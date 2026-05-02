@@ -21,8 +21,6 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import it.flavianopetrocchi.jpdfbookmarks.ai.service.StripeCatalogPrices;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +29,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -46,7 +46,9 @@ import javax.swing.JTree;
 import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
+import javax.swing.UIManager;
 import javax.swing.WindowConstants;
+import javax.swing.plaf.basic.BasicButtonUI;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
@@ -55,10 +57,12 @@ import javax.swing.tree.TreeSelectionModel;
 import org.apache.pdfbox.pdmodel.PDDocument;
 
 /**
- * Anteprima indice (parte dei segnalibri leggibili fino al pagamento), acquisto Standard via Stripe, verifica stato
- * all'apertura se il task risulta già pagato, e polling ogni 5 secondi quando serve.
+ * Anteprima indice (parte dei segnalibri leggibili fino al pagamento), acquisto Standard tramite URL di checkout
+ * fornito dal backend, verifica stato all'apertura se il task risulta già pagato, e polling ogni 5 secondi quando serve.
  */
 public class AiPreviewDialog extends JDialog {
+
+    private static final Logger LOG = Logger.getLogger(AiPreviewDialog.class.getName());
 
     /** Percentuale di nodi segnalibro (preorder) mostrati in chiaro nell'anteprima gratuita. */
     private static final double PREVIEW_VISIBLE_FRACTION = 0.30;
@@ -103,41 +107,6 @@ public class AiPreviewDialog extends JDialog {
     private final JTree previewTree;
     private final DefaultTreeModel previewTreeModel;
     private final JPanel dynamicPaymentArea;
-
-    /**
-     * Aggiunge {@code client_reference_id} e {@code taskId} alla URL di checkout Stripe (compatibilità senza tier).
-     */
-    public static String appendStripeCheckoutQueryParams(String baseUrl, String taskId) {
-        return appendStripeCheckoutQueryParams(baseUrl, taskId, null);
-    }
-
-    /**
-     * Aggiunge {@code client_reference_id}, {@code taskId} e opzionalmente {@code tier} / {@code model_type} (stesso
-     * valore) così il backend o il Payment Link possono classificare il checkout.
-     *
-     * @param checkoutTier {@code standard}, {@code advanced}, oppure {@code null} per non aggiungere i parametri tier.
-     */
-    public static String appendStripeCheckoutQueryParams(String baseUrl, String taskId, String checkoutTier) {
-        if (baseUrl == null || baseUrl.isBlank() || taskId == null || taskId.isBlank()) {
-            return baseUrl != null ? baseUrl : "";
-        }
-        String enc = URLEncoder.encode(taskId.trim(), StandardCharsets.UTF_8);
-        StringBuilder sb = new StringBuilder(96);
-        sb.append("client_reference_id=").append(enc).append("&taskId=").append(enc);
-        if (checkoutTier != null && !checkoutTier.isBlank()) {
-            String t = checkoutTier.trim().toLowerCase(Locale.ROOT);
-            if ("standard".equals(t) || "advanced".equals(t)) {
-                String encTier = URLEncoder.encode(t, StandardCharsets.UTF_8);
-                sb.append("&tier=").append(encTier);
-                sb.append("&model_type=").append(encTier);
-            }
-        }
-        String q = sb.toString();
-        if (baseUrl.contains("?")) {
-            return baseUrl + "&" + q;
-        }
-        return baseUrl + "?" + q;
-    }
 
     public AiPreviewDialog(
             Frame owner,
@@ -369,7 +338,7 @@ public class AiPreviewDialog extends JDialog {
 
     private void populateUnpaidPaymentLayout() {
         liveStandardPriceLabelRef.set(null);
-        dynamicPaymentArea.add(buildPaymentCard(paymentConfig.cloudStripeCheckoutMiniUrl()));
+        dynamicPaymentArea.add(buildPaymentCard("standard"));
         scheduleStripePriceRefreshIfConfigured();
     }
 
@@ -517,7 +486,10 @@ public class AiPreviewDialog extends JDialog {
         }
     }
 
-    private JPanel buildPaymentCard(String stripeBaseUrl) {
+    /**
+     * @param checkoutTier {@code standard} o {@code advanced}, inviato al backend create-checkout.
+     */
+    private JPanel buildPaymentCard(String checkoutTier) {
         JPanel card = new JPanel(new GridBagLayout());
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
         card.setBorder(BorderFactory.createCompoundBorder(
@@ -551,48 +523,100 @@ public class AiPreviewDialog extends JDialog {
         c.insets = new Insets(12, 0, 0, 0);
         JButton pay = new JButton(Res.getString("AI_PREVIEW_BTN_STANDARD"));
         styleGreenButton(pay);
-        String url = stripeBaseUrl != null ? stripeBaseUrl.trim() : "";
-        boolean canPay = hasTaskId && !url.isEmpty();
+        String endpoint =
+                paymentConfig.cloudCreateCheckoutUrl() != null ? paymentConfig.cloudCreateCheckoutUrl().trim() : "";
+        boolean canPay = hasTaskId && !endpoint.isEmpty();
         pay.setEnabled(canPay);
         if (!hasTaskId) {
             pay.setToolTipText(Res.getString("AI_PREVIEW_WAIT_TASK_TOOLTIP"));
-        } else if (url.isEmpty()) {
-            pay.setToolTipText(Res.getString("AI_PREVIEW_STRIPE_URL_MISSING_TOOLTIP"));
+        } else if (endpoint.isEmpty()) {
+            pay.setToolTipText(Res.getString("AI_PREVIEW_CHECKOUT_URL_MISSING_TOOLTIP"));
         }
-        pay.addActionListener(
-                e -> {
-                    try {
-                        String withParams = appendStripeCheckoutQueryParams(url, taskId, "standard");
-                        if (Desktop.isDesktopSupported()
-                                && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                            Desktop.getDesktop().browse(URI.create(withParams));
-                        } else {
-                            JOptionPane.showMessageDialog(
-                                    AiPreviewDialog.this,
-                                    withParams,
-                                    Res.getString("AI_PREVIEW_WINDOW_TITLE"),
-                                    JOptionPane.INFORMATION_MESSAGE);
-                        }
-                    } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(
-                                AiPreviewDialog.this,
-                                ex.getMessage(),
-                                Res.getString("AI_INDEX_ERROR_TITLE"),
-                                JOptionPane.ERROR_MESSAGE);
-                    }
-                });
+        pay.addActionListener(e -> startCreateCheckoutAndBrowse(pay, checkoutTier));
         card.add(pay, c);
         return card;
     }
 
+    private void startCreateCheckoutAndBrowse(JButton payButton, String checkoutTier) {
+        String configuredCheckoutUrl =
+                paymentConfig.cloudCreateCheckoutUrl() != null ? paymentConfig.cloudCreateCheckoutUrl().trim() : "";
+        if (LOG.isLoggable(Level.INFO)) {
+            LOG.log(
+                    Level.INFO,
+                    "create-checkout button: tier={0} taskId={1} configuredUrl={2}",
+                    new Object[] {checkoutTier, taskId, configuredCheckoutUrl});
+        }
+        payButton.setEnabled(false);
+        payButton.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() throws Exception {
+                return fetcher.createCheckout(taskId, checkoutTier);
+            }
+
+            @Override
+            protected void done() {
+                payButton.setEnabled(true);
+                payButton.setCursor(Cursor.getDefaultCursor());
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    String checkoutUrl = get();
+                    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                        Desktop.getDesktop().browse(URI.create(checkoutUrl.trim()));
+                    } else {
+                        JOptionPane.showMessageDialog(
+                                AiPreviewDialog.this,
+                                checkoutUrl,
+                                Res.getString("AI_PREVIEW_WINDOW_TITLE"),
+                                JOptionPane.INFORMATION_MESSAGE);
+                    }
+                } catch (Exception ex) {
+                    Throwable c = ex.getCause() != null ? ex.getCause() : ex;
+                    String msg =
+                            c instanceof AiOrchestrationException
+                                    ? c.getMessage()
+                                    : (c.getMessage() != null ? c.getMessage() : ex.toString());
+                    LOG.log(Level.WARNING, "create-checkout failed (tier=" + checkoutTier + ", taskId=" + taskId + "): " + msg, ex);
+                    JOptionPane.showMessageDialog(
+                            AiPreviewDialog.this,
+                            msg,
+                            Res.getString("AI_INDEX_ERROR_TITLE"),
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
     private static void styleGreenButton(JButton b) {
         Color green = new Color(46, 125, 50);
+        Color greenEdge = new Color(35, 95, 40);
+        /*
+         * Windows (e altri LaF nativi) spesso ignorano setBackground su JButton lasciando solo il testo “disabled”
+         * grigio, soprattutto senza FlatLaf (es. bundle .zip in Sandbox). BasicButtonUI rispetta sfondo/bordo.
+         */
+        if (!isFlatLookAndFeel()) {
+            b.setUI(new BasicButtonUI());
+        }
         b.setBackground(green);
         b.setForeground(Color.WHITE);
         b.setOpaque(true);
+        b.setContentAreaFilled(true);
         b.setFocusPainted(false);
-        b.setBorderPainted(false);
+        b.setBorderPainted(true);
+        b.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(greenEdge, 1),
+                BorderFactory.createEmptyBorder(8, 16, 8, 16)));
         b.setFont(b.getFont().deriveFont(Font.BOLD, b.getFont().getSize2D() + 1f));
+    }
+
+    private static boolean isFlatLookAndFeel() {
+        try {
+            return UIManager.getLookAndFeel().getClass().getName().toLowerCase(Locale.ROOT).contains("flat");
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void closeAndStop() {

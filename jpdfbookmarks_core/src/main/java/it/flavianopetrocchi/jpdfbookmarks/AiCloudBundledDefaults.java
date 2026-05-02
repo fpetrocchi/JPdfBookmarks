@@ -43,8 +43,7 @@ final class AiCloudBundledDefaults {
     private final String anonKey;
     private final String checkPaymentUrl;
     private final String fetchFullUrl;
-    private final String stripeCheckoutMiniUrl;
-    private final String stripeCheckoutAdvancedUrl;
+    private final String createCheckoutUrl;
     private final String stripePricesUrl;
 
     private AiCloudBundledDefaults(
@@ -52,15 +51,13 @@ final class AiCloudBundledDefaults {
             String anonKey,
             String checkPaymentUrl,
             String fetchFullUrl,
-            String stripeCheckoutMiniUrl,
-            String stripeCheckoutAdvancedUrl,
+            String createCheckoutUrl,
             String stripePricesUrl) {
         this.processIndexUrl = processIndexUrl;
         this.anonKey = anonKey;
         this.checkPaymentUrl = checkPaymentUrl;
         this.fetchFullUrl = fetchFullUrl;
-        this.stripeCheckoutMiniUrl = stripeCheckoutMiniUrl;
-        this.stripeCheckoutAdvancedUrl = stripeCheckoutAdvancedUrl;
+        this.createCheckoutUrl = createCheckoutUrl;
         this.stripePricesUrl = stripePricesUrl;
     }
 
@@ -88,12 +85,8 @@ final class AiCloudBundledDefaults {
         return fetchFullUrl;
     }
 
-    String stripeCheckoutMiniUrl() {
-        return stripeCheckoutMiniUrl;
-    }
-
-    String stripeCheckoutAdvancedUrl() {
-        return stripeCheckoutAdvancedUrl;
+    String createCheckoutUrl() {
+        return createCheckoutUrl;
     }
 
     String stripePricesUrl() {
@@ -115,8 +108,7 @@ final class AiCloudBundledDefaults {
                 trimOrEmpty(p.getProperty("ai.cloud.anon.key")),
                 trimOrEmpty(p.getProperty("ai.cloud.check.payment.url")),
                 trimOrEmpty(p.getProperty("ai.cloud.fetch.full.url")),
-                trimOrEmpty(p.getProperty("ai.cloud.stripe.checkout.mini.url")),
-                trimOrEmpty(p.getProperty("ai.cloud.stripe.checkout.advanced.url")),
+                trimOrEmpty(p.getProperty("ai.cloud.create.checkout.url")),
                 trimOrEmpty(p.getProperty("ai.cloud.stripe.prices.url")));
     }
 

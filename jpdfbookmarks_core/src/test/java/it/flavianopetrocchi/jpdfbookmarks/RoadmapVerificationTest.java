@@ -1,6 +1,7 @@
 package it.flavianopetrocchi.jpdfbookmarks;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,8 +26,15 @@ class RoadmapVerificationTest {
     void aiOptionsTabHiddenUnlessDevProperty() {
         System.clearProperty("jpdfbookmarks.dev.showAiOptions");
         assertFalse(OptionsDlg.isAiOptionsTabVisible(), "Consumer default: tab IA nascosto");
+        assertFalse(AiReleasePolicy.isAdvancedAiOptionsTabEnabled());
         System.setProperty("jpdfbookmarks.dev.showAiOptions", "true");
         assertTrue(OptionsDlg.isAiOptionsTabVisible(), "Con -Djpdfbookmarks.dev.showAiOptions=true");
+    }
+
+    @Test
+    void consumerBuildForcesAiExtractionModeCloud() {
+        System.clearProperty("jpdfbookmarks.dev.showAiOptions");
+        assertEquals(Prefs.AI_EXTRACTION_MODE_CLOUD, new Prefs().getAiExtractionMode());
     }
 
     @Test

@@ -41,4 +41,20 @@ class PrefsStripeCatalogPricesUrlTest {
     void deriveReturnsEmptyWhenNotCheckPayment() {
         assertTrue(Prefs.deriveStripeCatalogPricesUrlFromCheckPayment("https://x.supabase.co/functions/v1/foo").isEmpty());
     }
+
+    @Test
+    void deriveCreateCheckoutFromCheckPayment() {
+        assertEquals(
+                "https://volwkfvgbonuytzdudqo.supabase.co/functions/v1/create-checkout",
+                Prefs.deriveCreateCheckoutUrlFromCheckPayment(
+                        "https://volwkfvgbonuytzdudqo.supabase.co/functions/v1/check-payment"));
+    }
+
+    @Test
+    void deriveCreateCheckoutStripsQuery() {
+        assertEquals(
+                "https://volwkfvgbonuytzdudqo.supabase.co/functions/v1/create-checkout",
+                Prefs.deriveCreateCheckoutUrlFromCheckPayment(
+                        "https://volwkfvgbonuytzdudqo.supabase.co/functions/v1/check-payment?x=1"));
+    }
 }

@@ -18,13 +18,20 @@
     <langchain4j.spring-boot-starter.version>1.12.2-beta22</langchain4j.spring-boot-starter.version>
     <flatlaf.version>3.5.4</flatlaf.version>
     <ikonli.version>12.3.1</ikonli.version>
-    <!-- Override in CI / settings.xml for cloud distribution builds (filtered into ai-cloud-defaults.properties). -->
+    <!--
+      Release: Maven filters jpdfbookmarks_core/.../ai-cloud-defaults.properties. Commit must stay free of secrets:
+      set ai.cloud.process.index.url and ai.cloud.anon.key (JWT anon Supabase pubblica) via one of:
+      - mvn -Dai.cloud.process.index.url=… -Dai.cloud.anon.key=… package
+      - profile in ~/.m2/settings.xml activating properties (see https://maven.apache.org/settings.html)
+      - CI secrets injected as -D… (never echo in logs)
+      OpenAI API keys belong only in ~/.m2/settings, env, or user prefs AI_OPENAI_API_KEY — never in POM or anon.key.
+      Empty here = cloud extraction shows AI_ERROR_CLOUD_EXTRACTION_CONSUMER until a release build supplies values.
+    -->
     <ai.cloud.process.index.url></ai.cloud.process.index.url>
     <ai.cloud.anon.key></ai.cloud.anon.key>
     <ai.cloud.check.payment.url></ai.cloud.check.payment.url>
     <ai.cloud.fetch.full.url></ai.cloud.fetch.full.url>
-    <ai.cloud.stripe.checkout.mini.url></ai.cloud.stripe.checkout.mini.url>
-    <ai.cloud.stripe.checkout.advanced.url></ai.cloud.stripe.checkout.advanced.url>
+    <ai.cloud.create.checkout.url></ai.cloud.create.checkout.url>
     <ai.cloud.stripe.prices.url></ai.cloud.stripe.prices.url>
   </properties>
   <licenses>

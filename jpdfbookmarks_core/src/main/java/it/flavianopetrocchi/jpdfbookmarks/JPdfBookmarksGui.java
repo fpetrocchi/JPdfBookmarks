@@ -3733,32 +3733,35 @@ class JPdfBookmarksGui extends JFrame implements FileOperationListener,
         } else if (bookmarkToFollow.getType() != BookmarkType.Unknown) {
 
             int destPage = bookmarkToFollow.getPageNumber();
-            viewPanel.goToPage(destPage);
+            // Page -1 marks "unset" (e.g. from AI placeholder); do not navigate or rescale.
+            if (destPage != -1) {
+                viewPanel.goToPage(destPage);
 
-            switch (bookmarkToFollow.getType()) {
-                case FitWidth:
-                    checkInheritTop.setSelected(bookmarkToFollow.getTop() < 0);
-                    viewPanel.setFitWidth(bookmarkToFollow.getTop());
-                    break;
-                case FitHeight:
-                    checkInheritLeft.setSelected(bookmarkToFollow.getLeft() < 0);
-                    viewPanel.setFitHeight(bookmarkToFollow.getLeft());
-                    break;
-                case FitPage:
-                    viewPanel.setFitPage();
-                    break;
-                case FitRect:
-                    viewPanel.setFitRect(bookmarkToFollow.getTop(), bookmarkToFollow.getLeft(),
-                            bookmarkToFollow.getBottom(), bookmarkToFollow.getRight());
-                    break;
-                case TopLeft:
-                case TopLeftZoom:
-                    checkInheritTop.setSelected(bookmarkToFollow.getTop() < 0);
-                    checkInheritLeft.setSelected(bookmarkToFollow.getLeft() < 0);
-                    checkInheritZoom.setSelected(bookmarkToFollow.getZoom() <= 0);
-                    viewPanel.setTopLeftZoom(bookmarkToFollow.getTop(),
-                            bookmarkToFollow.getLeft(), bookmarkToFollow.getZoom());
-                    break;
+                switch (bookmarkToFollow.getType()) {
+                    case FitWidth:
+                        checkInheritTop.setSelected(bookmarkToFollow.getTop() < 0);
+                        viewPanel.setFitWidth(bookmarkToFollow.getTop());
+                        break;
+                    case FitHeight:
+                        checkInheritLeft.setSelected(bookmarkToFollow.getLeft() < 0);
+                        viewPanel.setFitHeight(bookmarkToFollow.getLeft());
+                        break;
+                    case FitPage:
+                        viewPanel.setFitPage();
+                        break;
+                    case FitRect:
+                        viewPanel.setFitRect(bookmarkToFollow.getTop(), bookmarkToFollow.getLeft(),
+                                bookmarkToFollow.getBottom(), bookmarkToFollow.getRight());
+                        break;
+                    case TopLeft:
+                    case TopLeftZoom:
+                        checkInheritTop.setSelected(bookmarkToFollow.getTop() < 0);
+                        checkInheritLeft.setSelected(bookmarkToFollow.getLeft() < 0);
+                        checkInheritZoom.setSelected(bookmarkToFollow.getZoom() <= 0);
+                        viewPanel.setTopLeftZoom(bookmarkToFollow.getTop(),
+                                bookmarkToFollow.getLeft(), bookmarkToFollow.getZoom());
+                        break;
+                }
             }
         }
 

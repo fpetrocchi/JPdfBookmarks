@@ -172,7 +172,9 @@ public class PdfViewAdapter extends JScrollPane implements IPdfView {
 
     public void goToBookmark(Bookmark bookmark) {
         int pageNum = bookmark.getPageNumber();
-        goToPage(pageNum);
+        if (pageNum != -1) {
+            goToPage(pageNum);
+        }
     }
 
     public void setFitWidth(int top) {

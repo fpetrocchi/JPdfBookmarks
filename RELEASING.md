@@ -20,7 +20,8 @@ carries no deployment-specific values. They must be **set when you package** the
 artifacts you ship (CI secrets, a private `settings.xml` profile, or a one-off
 `mvn` command). Do **not** commit real secrets (e.g. Supabase **service_role**,
 Stripe secret keys, OpenAI keys): only **public client** values belong here, such as
-the Supabase **anon** key and HTTPS URLs to your Edge Functions / checkout links.
+the Supabase **anon** key and HTTPS URLs to your Edge Functions (including
+`create-checkout` for payment; the client does not embed Stripe Payment Links).
 
 Relevant POM property names (all optional for a given release, but **cloud mode
 needs at least** `process.index` URL and `anon` key to be non-empty in the JAR if
@@ -32,8 +33,8 @@ users have no other way to configure them):
 | `ai.cloud.anon.key` | Supabase **anon** JWT (client key) |
 | `ai.cloud.check.payment.url` | Payment / entitlement check (if used) |
 | `ai.cloud.fetch.full.url` | Fetch full bookmarks after payment (if used) |
-| `ai.cloud.stripe.checkout.mini.url` | Stripe Checkout URL for mini tier (if used) |
-| `ai.cloud.stripe.checkout.advanced.url` | Stripe Checkout URL for advanced tier (if used) |
+| `ai.cloud.create.checkout.url` | `POST` URL for the create-checkout Edge Function (backend returns an opaque checkout URL; tier is sent in the JSON body) |
+| `ai.cloud.stripe.prices.url` | Optional: `stripe-catalog-prices` for displaying amounts in the UI |
 
 Example (replace placeholders; line breaks for readability only):
 
@@ -43,8 +44,7 @@ mvn -q clean package ^
   -Dai.cloud.anon.key="YOUR_SUPABASE_ANON_JWT" ^
   -Dai.cloud.check.payment.url="https://YOUR_REF.supabase.co/functions/v1/check-payment" ^
   -Dai.cloud.fetch.full.url="https://YOUR_REF.supabase.co/functions/v1/fetch-bookmarks" ^
-  -Dai.cloud.stripe.checkout.mini.url="https://YOUR_CHECKOUT_MINI_URL" ^
-  -Dai.cloud.stripe.checkout.advanced.url="https://YOUR_CHECKOUT_ADVANCED_URL"
+  -Dai.cloud.create.checkout.url="https://YOUR_REF.supabase.co/functions/v1/create-checkout"
 ```
 
 On Unix shells, use `\` instead of `^` for line continuation, or pass the same
@@ -74,6 +74,22 @@ assembly differs):
 2. A **developer** build with empty properties is still valid: cloud defaults in
    the JAR will be empty; local OpenAI/Ollama or manual prefs / dev flags apply
    instead (see `OptionsDlg.isAiOptionsTabVisible()` and project docs).
+
+### Official binaries: private repo `JPdfBookmarks-private`
+
+Maintainers can version **production `ai.cloud.*` values** (Supabase anon JWT, Edge Function
+URLs including `create-checkout`) in a separate **private** GitHub repository so the public
+tree stays empty while shipped installers embed filled defaults.
+
+- Clone: `https://github.com/fpetrocchi/JPdfBookmarks-private.git` (same machine as the public clone).
+- Edit `maven/ai-cloud-release.properties` there (copy from `maven/ai-cloud-release.properties.example` if needed).
+- Run `.\scripts\release-package.ps1` from that repo; it wraps [`scripts/package-with-local-cloud.ps1`](scripts/package-with-local-cloud.ps1)
+  with that properties file and builds `package` with `-SkipTests`.
+- Batch MSI installer (`JPdfBookmarks_INSTALLER_BUILD-main/src/build-installer-msi.bat` on your machine next to the public clone):
+  if `JPDFBOOKMARKS_PRIVATE\scripts\release-package.ps1` exists (default sibling folder `JPdfBookmarks-private`),
+  the MSI build uses it instead of plain `mvn package`. Override with env `JPDFBOOKMARKS_PRIVATE` if your layout differs.
+
+Do **not** put OpenAI keys or Supabase **service_role** in that file—only client-safe values as in the table above.
 
 ## Git tag
 

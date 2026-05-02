@@ -151,7 +151,8 @@
             "projectName": "jpdfbookmarks_core",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "shortenCommandLine": "auto"
+            "shortenCommandLine": "auto",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -162,7 +163,20 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=en -Duser.country=US"
+            "vmArgs": "-Duser.language=en -Duser.country=US",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
+        },
+        {
+            "type": "java",
+            "name": "JPdfBookmarks [en_US] LOG_INFO",
+            "request": "launch",
+            "mainClass": "it.flavianopetrocchi.jpdfbookmarks.JPdfBookmarks",
+            "projectName": "jpdfbookmarks_core",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "shortenCommandLine": "auto",
+            "vmArgs": "-Duser.language=en -Duser.country=US -Djava.util.logging.ConsoleHandler.level=INFO -Dit.flavianopetrocchi.jpdfbookmarks.level=INFO",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -173,7 +187,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=it -Duser.country=IT"
+            "vmArgs": "-Duser.language=it -Duser.country=IT",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -184,7 +199,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=el -Duser.country=GR"
+            "vmArgs": "-Duser.language=el -Duser.country=GR",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -195,7 +211,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=ru -Duser.country=RU"
+            "vmArgs": "-Duser.language=ru -Duser.country=RU",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -206,7 +223,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=zh -Duser.country=TW"
+            "vmArgs": "-Duser.language=zh -Duser.country=TW",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -217,7 +235,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=zh -Duser.country=CN"
+            "vmArgs": "-Duser.language=zh -Duser.country=CN",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -228,7 +247,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=es -Duser.country=ES"
+            "vmArgs": "-Duser.language=es -Duser.country=ES",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -239,7 +259,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=fr -Duser.country=FR"
+            "vmArgs": "-Duser.language=fr -Duser.country=FR",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -250,7 +271,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "vmArgs": "-Duser.language=de -Duser.country=DE"
+            "vmArgs": "-Duser.language=de -Duser.country=DE",
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
@@ -261,7 +283,7 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "shortenCommandLine": "auto",
-            "preLaunchTask": "Maven: compile (reactor)"
+            "preLaunchTask": "Maven: compile (local ai-cloud)"
         },
         {
             "type": "java",
